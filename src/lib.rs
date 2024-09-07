@@ -2,10 +2,7 @@ use std::default;
 
 use rapier3d::control::{DynamicRayCastVehicleController, WheelTuning};
 use rapier3d::prelude::*;
-
-fn main() {
-    println!("Hello, world!");
-}
+use pyo3::prelude::*;
 
 struct CarSimulation {
     bodies: RigidBodySet,
@@ -53,4 +50,9 @@ fn init_car(bodies: &mut RigidBodySet, colliders: &mut ColliderSet) {
     for pos in wheel_positions {
         vehicle.add_wheel(pos, -Vector::y(), Vector::z(), hh, hh / 4.0, &tuning);
     }
+}
+
+#[pymodule]
+fn car_sim(m: &Bound<'_, PyModule>) -> PyResult<()> {
+
 }
