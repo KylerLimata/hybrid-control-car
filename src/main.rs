@@ -1,8 +1,32 @@
+use std::default;
+
 use rapier3d::control::{DynamicRayCastVehicleController, WheelTuning};
 use rapier3d::prelude::*;
 
 fn main() {
     println!("Hello, world!");
+}
+
+struct CarSimulation {
+    bodies: RigidBodySet,
+    colliders: ColliderSet,
+    impulse_joints: ImpulseJointSet,
+    multibody_joints: MultibodyJointSet
+}
+
+impl CarSimulation {
+    fn new() -> CarSimulation {
+        let mut sim = CarSimulation {
+            bodies: RigidBodySet::new(),
+            colliders: ColliderSet::new(),
+            impulse_joints: ImpulseJointSet::new(),
+            multibody_joints: MultibodyJointSet::new(),
+        };
+
+        init_car(&mut sim.bodies, &mut sim.colliders);
+
+        return sim;
+    }
 }
 
 fn init_car(bodies: &mut RigidBodySet, colliders: &mut ColliderSet) {
