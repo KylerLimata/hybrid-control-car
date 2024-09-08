@@ -53,6 +53,6 @@ fn init_car(bodies: &mut RigidBodySet, colliders: &mut ColliderSet) {
 }
 
 #[pymodule]
-fn car_sim(m: &Bound<'_, PyModule>) -> PyResult<()> {
-
+fn hybrid_control_car(m: &Bound<'_, PyModule>) -> PyResult<()> {
+    Ok(())
 }
