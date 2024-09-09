@@ -1,5 +1,5 @@
 [package]
-name = "hybrid-control-car"
+name = "hybrid_control_car"
 version = "0.1.0"
 edition = "2021"
 

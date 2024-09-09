@@ -3,7 +3,7 @@ requires = ["maturin>=1.7,<2.0"]
 build-backend = "maturin"
 
 [project]
-name = "hybrid-control-car"
+name = "hybrid_control_car"
 requires-python = ">=3.8"
 classifiers = [
     "Programming Language :: Rust",

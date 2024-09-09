@@ -20,8 +20,10 @@ struct CarSimulation {
     car: RigidBodyHandle
 }
 
+#[pymethods]
 impl CarSimulation {
-    fn new() -> CarSimulation {
+    #[new]
+    fn new() -> Self {
         let mut bodies = RigidBodySet::new();
         let mut colliders = ColliderSet::new();
 
@@ -75,5 +77,11 @@ fn init_car(bodies: &mut RigidBodySet, colliders: &mut ColliderSet) -> RigidBody
 
 #[pymodule]
 fn hybrid_control_car(m: &Bound<'_, PyModule>) -> PyResult<()> {
+    println!("Hello!");
+    match m.add_class::<CarSimulation>() {
+        Ok(_) => println!("Successfully registered class!"),
+        Err(error) => println!("Error when adding class: {}", error),
+    }
+
     Ok(())
 }
