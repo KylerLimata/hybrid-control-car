@@ -45,6 +45,12 @@ impl CarSimulation {
             car: car
         }
     }
+
+
+    fn step(&mut self) -> PyResult<()> {
+        println!("Stepping!");
+        Ok(())
+    }
 }
 
 fn init_car(bodies: &mut RigidBodySet, colliders: &mut ColliderSet) -> RigidBodyHandle {
@@ -77,11 +83,6 @@ fn init_car(bodies: &mut RigidBodySet, colliders: &mut ColliderSet) -> RigidBody
 
 #[pymodule]
 fn hybrid_control_car(m: &Bound<'_, PyModule>) -> PyResult<()> {
-    println!("Hello!");
-    match m.add_class::<CarSimulation>() {
-        Ok(_) => println!("Successfully registered class!"),
-        Err(error) => println!("Error when adding class: {}", error),
-    }
-
+    m.add_class::<CarSimulation>()?;
     Ok(())
 }
