@@ -1,32 +1,51 @@
-use std::default;
-
+use nalgebra::Vector3;
 use rapier3d::control::{DynamicRayCastVehicleController, WheelTuning};
 use rapier3d::prelude::*;
 use pyo3::prelude::*;
 
+#[pyclass]
 struct CarSimulation {
+    physics_pipeline: PhysicsPipeline,
+    gravity: Vector3<f32>,
+    integration_parameters: IntegrationParameters,
+    island_manager: IslandManager,
+    broad_phase: BroadPhaseMultiSap,
+    narrow_phase: NarrowPhase, 
     bodies: RigidBodySet,
     colliders: ColliderSet,
     impulse_joints: ImpulseJointSet,
-    multibody_joints: MultibodyJointSet
+    multibody_joints: MultibodyJointSet,
+    ccd_solver: CCDSolver,
+    query_pipeline: QueryPipeline,
+    car: RigidBodyHandle
 }
 
 impl CarSimulation {
     fn new() -> CarSimulation {
-        let mut sim = CarSimulation {
-            bodies: RigidBodySet::new(),
-            colliders: ColliderSet::new(),
+        let mut bodies = RigidBodySet::new();
+        let mut colliders = ColliderSet::new();
+
+        let car = init_car(&mut bodies, &mut colliders);
+
+        CarSimulation {
+            physics_pipeline: PhysicsPipeline::new(),
+            gravity: vector![0.0, -9.81, 0.0],
+            integration_parameters: IntegrationParameters::default(),
+            island_manager: IslandManager::new(),
+            broad_phase: BroadPhaseMultiSap::new(),
+            narrow_phase: NarrowPhase::new(),
+            bodies: bodies,
+            colliders: colliders,
             impulse_joints: ImpulseJointSet::new(),
             multibody_joints: MultibodyJointSet::new(),
-        };
-
-        init_car(&mut sim.bodies, &mut sim.colliders);
-
-        return sim;
+            ccd_solver: CCDSolver::new(),
+            query_pipeline: QueryPipeline::new(),
+            car: car
+        }
     }
 }
 
-fn init_car(bodies: &mut RigidBodySet, colliders: &mut ColliderSet) {
+fn init_car(bodies: &mut RigidBodySet, colliders: &mut ColliderSet) -> RigidBodyHandle {
     let hw = 0.3;
     let hh = 0.15;
     let rigid_body = RigidBodyBuilder::dynamic().translation(vector![0.0, 1.0, 0.0]);
@@ -50,6 +69,8 @@ fn init_car(bodies: &mut RigidBodySet, colliders: &mut ColliderSet) {
     for pos in wheel_positions {
         vehicle.add_wheel(pos, -Vector::y(), Vector::z(), hh, hh / 4.0, &tuning);
     }
+
+    return vehicle_handle;
 }
 
 #[pymodule]
