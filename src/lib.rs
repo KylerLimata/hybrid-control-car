@@ -27,6 +27,15 @@ impl CarSimulation {
         let mut bodies = RigidBodySet::new();
         let mut colliders = ColliderSet::new();
 
+        let ground_size = 500.0;
+        let ground_height = 0.1;
+
+        let rigid_body = RigidBodyBuilder::fixed().translation(vector![0.0, -ground_height, 0.0]);
+        let floor_handle = bodies.insert(rigid_body);
+        let collider = ColliderBuilder::cuboid(ground_size, ground_height, ground_size);
+        colliders.insert_with_parent(collider, floor_handle, &mut bodies);
+
+
         let car = init_car(&mut bodies, &mut colliders);
 
         CarSimulation {
@@ -54,6 +63,14 @@ impl CarSimulation {
         wheels[0].steering = steering_angle;
         wheels[1].engine_force = engine_force;
         wheels[1].steering = steering_angle;
+
+        self.car.update_vehicle(
+            self.integration_parameters.dt,
+            &mut self.bodies,
+            &self.colliders,
+            &self.query_pipeline,
+            QueryFilter::exclude_dynamic().exclude_rigid_body(self.car.chassis),
+        );
 
         // Step the physics pipeline
         self.physics_pipeline.step(
