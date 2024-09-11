@@ -17,7 +17,7 @@ struct CarSimulation {
     multibody_joints: MultibodyJointSet,
     ccd_solver: CCDSolver,
     query_pipeline: QueryPipeline,
-    car: RigidBodyHandle
+    car: DynamicRayCastVehicleController
 }
 
 #[pymethods]
@@ -46,14 +46,44 @@ impl CarSimulation {
         }
     }
 
+    fn step(&mut self, engine_force: f32, steering_angle: f32) -> PyResult<Vec<f32>> {
+        // Update the steering and throttle
+        let wheels = self.car.wheels_mut();
 
-    fn step(&mut self) -> PyResult<()> {
-        println!("Stepping!");
-        Ok(())
+        wheels[0].engine_force = engine_force;
+        wheels[0].steering = steering_angle;
+        wheels[1].engine_force = engine_force;
+        wheels[1].steering = steering_angle;
+
+        // Step the physics pipeline
+        self.physics_pipeline.step(
+            &self.gravity,
+            &self.integration_parameters,
+            &mut self.island_manager,
+            &mut self.broad_phase,
+            &mut self.narrow_phase,
+            &mut self.bodies,
+            &mut self.colliders,
+            &mut self.impulse_joints,
+            &mut self.multibody_joints,
+            &mut self.ccd_solver,
+            Some(&mut self.query_pipeline),
+            &(),
+            &(),
+        );
+
+        // Retrieve the horizontal position and velocity of the vehicle
+        let car_handle = self.car.chassis;
+        let car_body = &self.bodies[car_handle];
+        let translation = car_body.translation();
+        let velocity = car_body.linvel();
+        let state = vec![translation.x, translation.z, velocity.x, velocity.z];
+
+        Ok(state)
     }
 }
 
-fn init_car(bodies: &mut RigidBodySet, colliders: &mut ColliderSet) -> RigidBodyHandle {
+fn init_car(bodies: &mut RigidBodySet, colliders: &mut ColliderSet) -> DynamicRayCastVehicleController {
     let hw = 0.3;
     let hh = 0.15;
     let rigid_body = RigidBodyBuilder::dynamic().translation(vector![0.0, 1.0, 0.0]);
@@ -66,7 +96,7 @@ fn init_car(bodies: &mut RigidBodySet, colliders: &mut ColliderSet) -> RigidBody
         suspension_damping: 10.0,
         ..WheelTuning::default()
     };
-    let mut vehicle = DynamicRayCastVehicleController::new(vehicle_handle);
+    let mut car = DynamicRayCastVehicleController::new(vehicle_handle);
     let wheel_positions = [
         point![hw * 1.5, -hh, hw],
         point![hw * 1.5, -hh, -hw],
@@ -75,10 +105,10 @@ fn init_car(bodies: &mut RigidBodySet, colliders: &mut ColliderSet) -> RigidBody
     ];
 
     for pos in wheel_positions {
-        vehicle.add_wheel(pos, -Vector::y(), Vector::z(), hh, hh / 4.0, &tuning);
+        car.add_wheel(pos, -Vector::y(), Vector::z(), hh, hh / 4.0, &tuning);
     }
 
-    return vehicle_handle;
+    return car;
 }
 
 #[pymodule]

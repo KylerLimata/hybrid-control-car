@@ -9,5 +9,5 @@ name = "hybrid_control_car"
 crate-type = ["cdylib"]
 
 [dependencies]
-rapier3d = { version = "0.22.0", features = [ "simd-stable"] }
+rapier3d = { version = "0.22.0" }
 pyo3 = "0.22.0"
