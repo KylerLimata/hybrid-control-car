@@ -1,4 +1,4 @@
-from typing import List
+from typing import List, Tuple
 
 
 class CarSimulation:
@@ -13,12 +13,17 @@ class CarSimulation:
         """
         Creates a large floor for the vehicle to drive around on. Useful for gathering data about the motion of the car.
         """
-    def step(self, engine_force: float, steering_angle: float) -> List[float]:
+    def step(self, engine_force: float, steering_angle: float) -> Tuple[List[float], bool, bool, bool]:
         """
-        Steps the simulation forward.
+        Steps the simulation forward and returns information about the simulation.
+        Of the four return values, the last three only apply if you've constructed a race course.
 
         :param engine_force: the force exerted by the car's engine.
         :param steering_angle: the steering angle of the front axis.
-        :return: The current state of the car. The first two numbers are the horizontal translation 
-        and the second two are the horizontal linear velocity
+        :return: tuple (state, colliding, checkpoint, finish) 
+            WHERE
+            state Is the horizontal position and linear velocity of the car
+            colliding Is whether the car is currently colliding with another object
+            checkpoint Is whether the car has reached a checkpoint
+            finish Is whether the car has reached the finish line
         """

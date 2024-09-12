@@ -99,7 +99,7 @@ impl CarSimulation {
         self.colliders.insert_with_parent(collider, floor_handle, &mut self.bodies);
     }
 
-    fn step(&mut self, engine_force: f32, steering_angle: f32) -> PyResult<Vec<f32>> {
+    fn step(&mut self, engine_force: f32, steering_angle: f32) -> PyResult<(Vec<f32>, bool, bool, bool)> {
         // Update the steering and throttle
         let car = self.car.as_mut().unwrap();
         let car_handle = car.chassis;
@@ -141,7 +141,12 @@ impl CarSimulation {
         let velocity = car_body.linvel();
         let state = vec![translation.x, translation.z, velocity.x, velocity.z];
 
-        Ok(state)
+        // Test whether the vehicle is colliding
+        let collider_handle = car_body.colliders()[0];
+        let collider = self.colliders.get(collider_handle).unwrap();
+        let colliding = collider.active_events().contains(ActiveEvents::COLLISION_EVENTS);
+
+        Ok((state, colliding, false, false))
     }
 }
 
