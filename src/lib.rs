@@ -24,17 +24,6 @@ struct CarSimulation {
 impl CarSimulation {
     #[new]
     fn new() -> Self {
-        let mut bodies = RigidBodySet::new();
-        let mut colliders = ColliderSet::new();
-
-        let ground_size = 500.0;
-        let ground_height = 0.1;
-
-        let rigid_body = RigidBodyBuilder::fixed().translation(vector![0.0, -ground_height, 0.0]);
-        let floor_handle = bodies.insert(rigid_body);
-        let collider = ColliderBuilder::cuboid(ground_size, ground_height, ground_size);
-        colliders.insert_with_parent(collider, floor_handle, &mut bodies);
-
         let mut sim = CarSimulation {
             physics_pipeline: PhysicsPipeline::new(),
             gravity: vector![0.0, -9.81, 0.0],
@@ -42,8 +31,8 @@ impl CarSimulation {
             islands: IslandManager::new(),
             broad_phase: BroadPhaseMultiSap::new(),
             narrow_phase: NarrowPhase::new(),
-            bodies: bodies,
-            colliders: colliders,
+            bodies: RigidBodySet::new(),
+            colliders: ColliderSet::new(),
             impulse_joints: ImpulseJointSet::new(),
             multibody_joints: MultibodyJointSet::new(),
             ccd_solver: CCDSolver::new(),
@@ -54,6 +43,60 @@ impl CarSimulation {
         sim.reset_car();
 
         return sim;
+    }
+
+    fn reset_car(&mut self) {
+        let bodies = &mut self.bodies;
+
+        // Remove the current car from the sim
+        if let Some(car) = &self.car  {
+            let chassis_handle = car.chassis;
+
+            bodies.remove(
+                chassis_handle, 
+                &mut self.islands, 
+                &mut self.colliders, 
+                &mut self.impulse_joints, 
+                &mut self.multibody_joints, 
+                true
+            );
+        }
+
+        let hw = 0.3;
+        let hh = 0.15;
+        let rigid_body = RigidBodyBuilder::dynamic().translation(vector![0.0, 0.0, 0.0]);
+        let vehicle_handle = bodies.insert(rigid_body);
+        let collider = ColliderBuilder::cuboid(hw * 2.0, hh, hw).density(100.0);
+        self.colliders.insert_with_parent(collider, vehicle_handle, bodies);
+
+        let tuning = WheelTuning {
+            suspension_stiffness: 100.0,
+            suspension_damping: 10.0,
+            ..WheelTuning::default()
+        };
+        let mut car = DynamicRayCastVehicleController::new(vehicle_handle);
+        let wheel_positions = [
+            point![hw * 1.5, -hh, hw],
+            point![hw * 1.5, -hh, -hw],
+            point![-hw * 1.5, -hh, hw],
+            point![-hw * 1.5, -hh, -hw],
+        ];
+
+        for pos in wheel_positions {
+            car.add_wheel(pos, -Vector::y(), Vector::z(), hh, hh / 4.0, &tuning);
+        }
+
+        self.car = Some(car)
+    }
+
+    fn create_floor(&mut self) {
+        let ground_size = 500.0;
+        let ground_height = 0.1;
+
+        let rigid_body = RigidBodyBuilder::fixed().translation(vector![0.0, -ground_height, 0.0]);
+        let floor_handle = self.bodies.insert(rigid_body);
+        let collider = ColliderBuilder::cuboid(ground_size, ground_height, ground_size);
+        self.colliders.insert_with_parent(collider, floor_handle, &mut self.bodies);
     }
 
     fn step(&mut self, engine_force: f32, steering_angle: f32) -> PyResult<Vec<f32>> {
@@ -99,50 +142,6 @@ impl CarSimulation {
         let state = vec![translation.x, translation.z, velocity.x, velocity.z];
 
         Ok(state)
-    }
-
-    fn reset_car(&mut self) {
-        let bodies = &mut self.bodies;
-
-        // Remove the current car from the sim
-        if let Some(car) = &self.car  {
-            let chassis_handle = car.chassis;
-
-            bodies.remove(
-                chassis_handle, 
-                &mut self.islands, 
-                &mut self.colliders, 
-                &mut self.impulse_joints, 
-                &mut self.multibody_joints, 
-                true
-            );
-        }
-
-        let hw = 0.3;
-        let hh = 0.15;
-        let rigid_body = RigidBodyBuilder::dynamic().translation(vector![0.0, 0.0, 0.0]);
-        let vehicle_handle = bodies.insert(rigid_body);
-        let collider = ColliderBuilder::cuboid(hw * 2.0, hh, hw).density(100.0);
-        self.colliders.insert_with_parent(collider, vehicle_handle, bodies);
-
-        let tuning = WheelTuning {
-            suspension_stiffness: 100.0,
-            suspension_damping: 10.0,
-            ..WheelTuning::default()
-        };
-        let mut car = DynamicRayCastVehicleController::new(vehicle_handle);
-        let wheel_positions = [
-            point![hw * 1.5, -hh, hw],
-            point![hw * 1.5, -hh, -hw],
-            point![-hw * 1.5, -hh, hw],
-            point![-hw * 1.5, -hh, -hw],
-        ];
-
-        for pos in wheel_positions {
-            car.add_wheel(pos, -Vector::y(), Vector::z(), hh, hh / 4.0, &tuning);
-        }
-
-        self.car = Some(car)
     }
 }
 
