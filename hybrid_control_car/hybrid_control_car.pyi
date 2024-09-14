@@ -24,7 +24,7 @@ class CarSimulation:
         :param steering_angle: the steering angle of the front axis.
         :return: tuple (state, colliding, checkpoint, finish) 
             WHERE
-            state Is the horizontal position and linear velocity of the car
+            state Is the horizontal position, forward velocity scalar, and rotation of the car
             colliding Is whether the car is currently colliding with another object
             checkpoint Is whether the car has reached a checkpoint
             finish Is whether the car has reached the finish line
