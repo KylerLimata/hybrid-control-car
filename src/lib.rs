@@ -40,12 +40,12 @@ impl CarSimulation {
             car: None
         };
 
-        sim.reset_car();
+        sim.reset_car(0.0);
 
         return sim;
     }
 
-    fn reset_car(&mut self) {
+    fn reset_car(&mut self, rotation: f32) {
         let bodies = &mut self.bodies;
 
         // Remove the current car from the sim
@@ -64,7 +64,9 @@ impl CarSimulation {
 
         let hw = 0.3;
         let hh = 0.15;
-        let rigid_body = RigidBodyBuilder::dynamic().translation(vector![0.0, 0.0, 0.0]);
+        let rigid_body = RigidBodyBuilder::dynamic()
+        .translation(vector![0.0, 0.0, 0.0])
+        .rotation(vector![0.0, rotation, 0.0]);
         let vehicle_handle = bodies.insert(rigid_body);
         let collider = ColliderBuilder::cuboid(hw * 2.0, hh, hw).density(100.0);
         self.colliders.insert_with_parent(collider, vehicle_handle, bodies);

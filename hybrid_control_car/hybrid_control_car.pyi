@@ -5,9 +5,11 @@ class CarSimulation:
     """
     An instance of a simulated robot car and its environment.
     """
-    def reset_car(self) -> None:
+    def reset_car(self, rotation: float) -> None:
         """
         Resets the simulated car to its initial state and position.
+
+        :param rotation: the initial rotation of the car body.
         """
     def create_floor(self) -> None:
         """
