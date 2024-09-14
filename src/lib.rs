@@ -137,11 +137,26 @@ impl CarSimulation {
             &(),
         );
 
-        // Retrieve the horizontal position and velocity of the vehicle
+        
         let car_body = &self.bodies[car_handle];
+        // Retrieve the horizontal position of the vehicle
         let translation = car_body.translation();
-        let velocity = car_body.linvel();
-        let state = vec![translation.x, translation.z, velocity.x, velocity.z];
+        let x = translation.x;
+        let z = translation.z;
+
+        // Retreive the rotation of the vehicle
+        let rotation = car_body.rotation().euler_angles(); // (roll, pitch, yaw)
+        let phi = rotation.2;
+
+        // Calculate the velocity of the vehicle in the direction its facing
+        // This may not necessarily be the same as the velocity of the body itself
+        // We could perform this calculation in Python, but that would require
+        // reconstructing the velocity vector first.
+        let body_velocity = car_body.linvel();
+        let v = body_velocity.dot(translation)/translation.magnitude();
+
+        // Create the state vector
+        let state = vec![x, z, v, phi];
 
         // Test whether the vehicle is colliding
         let collider_handle = car_body.colliders()[0];
