@@ -65,7 +65,7 @@ impl CarSimulation {
         let hw = 0.3;
         let hh = 0.15;
         let rigid_body = RigidBodyBuilder::dynamic()
-        .translation(vector![0.0, 0.0, 0.0])
+        .translation(vector![0.0, hh + hh/4.0, 0.0])
         .rotation(vector![0.0, rotation, 0.0]);
         let vehicle_handle = bodies.insert(rigid_body);
         let collider = ColliderBuilder::cuboid(hw * 2.0, hh, hw).density(100.0);
