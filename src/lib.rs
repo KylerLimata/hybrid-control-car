@@ -1,4 +1,4 @@
-use nalgebra::Vector3;
+use nalgebra::{Rotation3, Vector3};
 use rapier3d::control::{DynamicRayCastVehicleController, WheelTuning};
 use rapier3d::prelude::*;
 use pyo3::prelude::*;
@@ -153,7 +153,8 @@ impl CarSimulation {
         // We could perform this calculation in Python, but that would require
         // reconstructing the velocity vector first.
         let body_velocity = car_body.linvel();
-        let v = body_velocity.dot(translation)/translation.magnitude();
+        let forwards = vector![f32::cos(phi), 0.0, f32::sin(phi)];
+        let v = body_velocity.dot(&forwards)/forwards.magnitude();
 
         // Create the state vector
         let state = vec![x, z, v, phi];
