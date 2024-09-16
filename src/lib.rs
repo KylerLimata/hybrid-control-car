@@ -1,4 +1,6 @@
-use nalgebra::{Rotation3, Vector3};
+use core::f32;
+
+use nalgebra::Vector3;
 use rapier3d::control::{DynamicRayCastVehicleController, WheelTuning};
 use rapier3d::prelude::*;
 use pyo3::prelude::*;
@@ -112,14 +114,6 @@ impl CarSimulation {
         wheels[1].engine_force = engine_force;
         wheels[1].steering = steering_angle;
 
-        car.update_vehicle(
-            self.integration_parameters.dt,
-            &mut self.bodies,
-            &self.colliders,
-            &self.query_pipeline,
-            QueryFilter::exclude_dynamic().exclude_rigid_body(car_handle),
-        );
-
         // Step the physics pipeline
         self.physics_pipeline.step(
             &self.gravity,
@@ -137,24 +131,59 @@ impl CarSimulation {
             &(),
         );
 
-        
+        // Update the car
+        car.update_vehicle(
+            self.integration_parameters.dt,
+            &mut self.bodies,
+            &self.colliders,
+            &self.query_pipeline,
+            QueryFilter::exclude_dynamic().exclude_rigid_body(car_handle),
+        );
         let car_body = &self.bodies[car_handle];
+        
         // Retrieve the horizontal position of the vehicle
         let translation = car_body.translation();
         let x = translation.x;
         let z = translation.z;
 
-        // Retreive the rotation of the vehicle
-        let rotation = car_body.rotation().euler_angles(); // (roll, pitch, yaw)
-        let phi = rotation.2;
+        // Retreive the rotation of the vehicle about the y-axis
+        let forwards = car_body.position() * Vector3::ith(car.index_forward_axis, 1.0);
+        let forwards_horiozntal = UnitVector::new_normalize(
+            vector![forwards.x, 0.0, forwards.z]
+        );
+        let x_f = forwards_horiozntal.x;
+        let z_f = forwards_horiozntal.z;
+        let pi = f32::consts::PI;
+        let mut phi = 0.0;
 
-        // Calculate the velocity of the vehicle in the direction its facing
-        // This may not necessarily be the same as the velocity of the body itself
-        // We could perform this calculation in Python, but that would require
-        // reconstructing the velocity vector first.
-        let body_velocity = car_body.linvel();
-        let forwards = vector![f32::cos(phi), 0.0, f32::sin(phi)];
-        let v = body_velocity.dot(&forwards)/forwards.magnitude();
+        if z_f == 0.0 {
+            if x_f == -1.0 {phi = pi;}
+        } else if x_f == 0.0 {
+            if z_f == 1.0 {
+                phi = pi/2.0;
+            } else {
+                phi = 3.0*pi/2.0;
+            }
+        } else {
+            let theta_ref = f32::atan(f32::abs(z_f/x_f));
+        
+            if x_f < 0.0 {
+                if z_f < 0.0 {
+                    phi = pi + theta_ref;
+                } else {
+                    phi = pi - theta_ref;
+                }
+            } else {
+                if z_f < 0.0 {
+                    phi = 2.0*pi - theta_ref;
+                } else {
+                    phi = theta_ref;
+                }
+            }
+        }        
+
+        // Retrieve the forward velocity of the vehicle
+        let v = car.current_vehicle_speed;
 
         // Create the state vector
         let state = vec![x, z, v, phi];
