@@ -146,47 +146,19 @@ impl CarSimulation {
         let x = translation.x;
         let z = translation.z;
 
-        // Retreive the rotation of the vehicle about the y-axis
+        // Calculate the components of the forwards vector.
         let forwards = car_body.position() * Vector3::ith(car.index_forward_axis, 1.0);
         let forwards_horiozntal = UnitVector::new_normalize(
             vector![forwards.x, 0.0, forwards.z]
         );
-        let x_f = forwards_horiozntal.x;
-        let z_f = forwards_horiozntal.z;
-        let pi = f32::consts::PI;
-        let mut phi = 0.0;
-
-        if z_f == 0.0 {
-            if x_f == -1.0 {phi = pi;}
-        } else if x_f == 0.0 {
-            if z_f == 1.0 {
-                phi = pi/2.0;
-            } else {
-                phi = 3.0*pi/2.0;
-            }
-        } else {
-            let theta_ref = f32::atan(f32::abs(z_f/x_f));
-        
-            if x_f < 0.0 {
-                if z_f < 0.0 {
-                    phi = pi + theta_ref;
-                } else {
-                    phi = pi - theta_ref;
-                }
-            } else {
-                if z_f < 0.0 {
-                    phi = 2.0*pi - theta_ref;
-                } else {
-                    phi = theta_ref;
-                }
-            }
-        }        
+        let n_x = forwards_horiozntal.x;
+        let n_z = forwards_horiozntal.z;
 
         // Retrieve the forward velocity of the vehicle
         let v = car.current_vehicle_speed;
 
         // Create the state vector
-        let state = vec![x, z, v, phi];
+        let state = vec![x, z, v, n_x, n_z];
 
         // Test whether the vehicle is colliding
         let collider_handle = car_body.colliders()[0];
