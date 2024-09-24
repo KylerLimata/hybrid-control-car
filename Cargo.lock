@@ -179,7 +179,7 @@ name = "hybrid_control_car"
 version = "0.1.0"
 dependencies = [
  "pyo3",
- "rapier3d",
+ "rapier3d-f64",
 ]
 
 [[package]]
@@ -328,10 +328,10 @@ dependencies = [
 ]
 
 [[package]]
-name = "parry3d"
+name = "parry3d-f64"
 version = "0.17.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "b5ebb313092c7cd16da86f8a6a14ac823e36ff1d9b8f727d25bdebf3e4bc4d56"
+checksum = "dffd3e480c045388fd95acc8b2c1e42706c84112f3d72c25e25c106c36105912"
 dependencies = [
  "approx",
  "arrayvec",
@@ -446,10 +446,10 @@ dependencies = [
 ]
 
 [[package]]
-name = "rapier3d"
+name = "rapier3d-f64"
 version = "0.22.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "87360935d1a54802efe0ddf908489436bb49c84865c36c930131843c7b1dc97d"
+checksum = "7a7a0cd7daa6f2caa8168b97e047faa1e445ee984c24e0ca984e7fc657278dde"
 dependencies = [
  "approx",
  "arrayvec",
@@ -462,7 +462,7 @@ dependencies = [
  "num-derive",
  "num-traits",
  "ordered-float",
- "parry3d",
+ "parry3d-f64",
  "rustc-hash",
  "simba",
  "thiserror",

@@ -1,14 +1,12 @@
-use core::f32;
-
 use nalgebra::Vector3;
-use rapier3d::control::{DynamicRayCastVehicleController, WheelTuning};
-use rapier3d::prelude::*;
+use rapier3d_f64::control::{DynamicRayCastVehicleController, WheelTuning};
+use rapier3d_f64::prelude::*;
 use pyo3::prelude::*;
 
 #[pyclass]
 struct CarSimulation {
     physics_pipeline: PhysicsPipeline,
-    gravity: Vector3<f32>,
+    gravity: Vector3<f64>,
     integration_parameters: IntegrationParameters,
     islands: IslandManager,
     broad_phase: BroadPhaseMultiSap,
@@ -47,7 +45,7 @@ impl CarSimulation {
         return sim;
     }
 
-    fn reset_car(&mut self, rotation: f32) {
+    fn reset_car(&mut self, rotation: f64) {
         let bodies = &mut self.bodies;
 
         // Remove the current car from the sim
@@ -103,7 +101,7 @@ impl CarSimulation {
         self.colliders.insert_with_parent(collider, floor_handle, &mut self.bodies);
     }
 
-    fn step(&mut self, engine_force: f32, steering_angle: f32) -> PyResult<(Vec<f32>, bool, bool, bool)> {
+    fn step(&mut self, engine_force: f64, steering_angle: f64) -> PyResult<(Vec<f64>, bool, bool, bool)> {
         // Update the steering and throttle
         let car = self.car.as_mut().unwrap();
         let car_handle = car.chassis;
