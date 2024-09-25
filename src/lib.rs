@@ -17,7 +17,8 @@ struct CarSimulation {
     multibody_joints: MultibodyJointSet,
     ccd_solver: CCDSolver,
     query_pipeline: QueryPipeline,
-    car: Option<DynamicRayCastVehicleController>
+    car: Option<DynamicRayCastVehicleController>,
+    last_wheel_rotation: f64
 }
 
 #[pymethods]
@@ -37,7 +38,8 @@ impl CarSimulation {
             multibody_joints: MultibodyJointSet::new(),
             ccd_solver: CCDSolver::new(),
             query_pipeline: QueryPipeline::new(),
-            car: None
+            car: None,
+            last_wheel_rotation: 0.0
         };
 
         sim.reset_car(0.0);
@@ -47,6 +49,7 @@ impl CarSimulation {
 
     fn reset_car(&mut self, rotation: f64) {
         let bodies = &mut self.bodies;
+        self.last_wheel_rotation = 0.0;
 
         // Remove the current car from the sim
         if let Some(car) = &self.car  {
@@ -111,6 +114,7 @@ impl CarSimulation {
         let car = self.car.as_mut().unwrap();
         let car_handle = car.chassis;
         let wheels = car.wheels_mut();
+        let wheel_rotation = wheels[0].rotation;
 
         wheels[0].engine_force = engine_force;
         wheels[0].steering = steering_angle;
@@ -149,6 +153,10 @@ impl CarSimulation {
         let x = translation.x;
         let z = translation.z;
 
+        // Retrieve the forward and angular velocity of the vehicle
+        let v = car.current_vehicle_speed;
+        let omega_c = car_body.angvel().y;
+
         // Calculate the components of the forwards vector.
         let forwards = car_body.position() * Vector3::ith(car.index_forward_axis, 1.0);
         let forwards_horiozntal = UnitVector::new_normalize(
@@ -157,11 +165,12 @@ impl CarSimulation {
         let n_x = forwards_horiozntal.x;
         let n_z = forwards_horiozntal.z;
 
-        // Retrieve the forward velocity of the vehicle
-        let v = car.current_vehicle_speed;
+        // Retrieve the angular velocity of the front wheels
+        let omega_w = wheel_rotation - self.last_wheel_rotation;
+        self.last_wheel_rotation = wheel_rotation;
 
         // Create the state vector
-        let state = vec![x, z, v, n_x, n_z];
+        let state = vec![x, z, v, n_x, n_z, omega_c, omega_w];
 
         // Test whether the vehicle is colliding
         let collider_handle = car_body.colliders()[0];
