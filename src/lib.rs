@@ -3,6 +3,8 @@ use rapier3d_f64::control::{DynamicRayCastVehicleController, WheelTuning};
 use rapier3d_f64::prelude::*;
 use pyo3::prelude::*;
 
+mod sim;
+
 #[pyclass]
 struct CarSimulation {
     physics_pipeline: PhysicsPipeline,

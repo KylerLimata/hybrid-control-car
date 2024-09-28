@@ -9,5 +9,6 @@ name = "hybrid_control_car"
 crate-type = ["cdylib"]
 
 [dependencies]
+libm = "0.2.8"
 rapier3d-f64 = { version = "0.22.0" }
 pyo3 = "0.22.0"
