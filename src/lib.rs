@@ -18,7 +18,8 @@ struct CarSimulation {
     ccd_solver: CCDSolver,
     query_pipeline: QueryPipeline,
     car: Option<DynamicRayCastVehicleController>,
-    last_wheel_rotation: f64
+    last_wheel_rotation: f64,
+    history: Vec<Vec<f64>>
 }
 
 #[pymethods]
@@ -39,7 +40,8 @@ impl CarSimulation {
             ccd_solver: CCDSolver::new(),
             query_pipeline: QueryPipeline::new(),
             car: None,
-            last_wheel_rotation: 0.0
+            last_wheel_rotation: 0.0,
+            history: vec![]
         };
 
         sim.reset_car(0.0);
@@ -50,6 +52,7 @@ impl CarSimulation {
     fn reset_car(&mut self, rotation: f64) {
         let bodies = &mut self.bodies;
         self.last_wheel_rotation = 0.0;
+        self.history = vec![];
 
         // Remove the current car from the sim
         if let Some(car) = &self.car  {
@@ -68,7 +71,7 @@ impl CarSimulation {
         let hw = 0.3;
         let hh = 0.15;
         let rigid_body = RigidBodyBuilder::dynamic()
-        .translation(vector![0.0, 1.0, 0.0])
+        .translation(vector![0.0, 2.0*hh + hh/4.0, 0.0])
         .rotation(vector![0.0, rotation, 0.0]);
         let vehicle_handle = bodies.insert(rigid_body);
         let collider = ColliderBuilder::cuboid(hw * 2.0, hh, hw).density(100.0);
@@ -92,11 +95,6 @@ impl CarSimulation {
         }
 
         self.car = Some(car);
-
-        // Let the car settle into place
-        for _ in 0..50 {
-            let _ = self.step(0.0, 0.0);
-        }
     }
 
     fn create_floor(&mut self) {
@@ -109,7 +107,12 @@ impl CarSimulation {
         self.colliders.insert_with_parent(collider, floor_handle, &mut self.bodies);
     }
 
-    fn step(&mut self, engine_force: f64, steering_angle: f64) -> PyResult<(Vec<f64>, bool, bool, bool)> {
+    fn step(&mut self, timestep: usize, engine_force: f64, steering_angle: f64) -> PyResult<(Vec<f64>, bool, bool, bool)> {
+        // Check if the car has already been simulated at the passed timestep
+        if self.history.len() >= timestep + 1 {
+            return Ok((self.history[timestep].clone(), false, false, false));
+        }
+
         // Update the steering and throttle
         let car = self.car.as_mut().unwrap();
         let car_handle = car.chassis;
@@ -171,6 +174,7 @@ impl CarSimulation {
 
         // Create the state vector
         let state = vec![x, z, v, n_x, n_z, omega_c, omega_w];
+        self.history.push(state.clone());
 
         // Test whether the vehicle is colliding
         let collider_handle = car_body.colliders()[0];

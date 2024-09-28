@@ -15,11 +15,13 @@ class CarSimulation:
         """
         Creates a large floor for the vehicle to drive around on. Useful for gathering data about the motion of the car.
         """
-    def step(self, engine_force: float, steering_angle: float) -> Tuple[List[float], bool, bool, bool]:
+    def step(self, timestep: int, engine_force: float, steering_angle: float) -> Tuple[List[float], bool, bool, bool]:
         """
         Steps the simulation forward and returns information about the simulation.
         Of the four return values, the last three only apply if you've constructed a race course.
 
+        :param timestep: the timestep to simulate; if the car has already been simulated at this timestep, it will return
+        the state from its stored history.
         :param engine_force: the force exerted by the car's engine.
         :param steering_angle: the steering angle of the front axis.
         :return: tuple (state, colliding, checkpoint, finish) 
