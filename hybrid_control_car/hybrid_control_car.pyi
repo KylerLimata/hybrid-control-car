@@ -1,5 +1,13 @@
 from typing import List, Tuple
 
+def simulate(x0, u):
+    """
+    Simulates the motion of a car
+
+    :param x0: The initial state of the car.
+    :param u: The control input.
+    """
+
 
 class CarSimulation:
     """

@@ -1,7 +1,9 @@
 use libm::atan2;
 use nalgebra::Vector3;
+use pyo3::pyfunction;
 use rapier3d_f64::{control::*, prelude::*};
 
+#[pyfunction]
 pub fn simulate(X0: Vec<f64>, u: Vec<f64>) -> Vec<f64> {
     let gravity = vector![0.0, -9.81, 0.0];
     let mut bodies = RigidBodySet::new();

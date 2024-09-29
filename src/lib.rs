@@ -188,7 +188,8 @@ impl CarSimulation {
 }
 
 #[pymodule]
-fn hybrid_control_car(m: &Bound<'_, PyModule>) -> PyResult<()> {
-    m.add_class::<CarSimulation>()?;
+fn hybrid_control_car(module: &Bound<'_, PyModule>) -> PyResult<()> {
+    module.add_class::<CarSimulation>()?;
+    let _ = module.add_function(wrap_pyfunction!(sim::simulate, module)?);
     Ok(())
 }
