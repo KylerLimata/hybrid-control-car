@@ -21,7 +21,16 @@ pub fn simulate(X0: Vec<f64>, u: Vec<f64>) -> Vec<f64> {
     let event_handler = ();
 
     create_floor(&mut bodies, &mut colliders);
-    let (car, car_handle) = create_car(X0, &mut bodies, &mut colliders);
+
+    let (mut car, car_handle) = create_car(X0, &mut bodies, &mut colliders);
+    let wheels = car.wheels_mut();
+    let engine_force = u[0];
+    let steering_angle = u[1];
+
+    wheels[0].engine_force = engine_force;
+    wheels[0].steering = steering_angle;
+    wheels[1].engine_force = engine_force;
+    wheels[1].steering = steering_angle;
 
     physics_pipeline.step(
         &gravity,
@@ -38,7 +47,15 @@ pub fn simulate(X0: Vec<f64>, u: Vec<f64>) -> Vec<f64> {
         &physics_hooks,
         &event_handler,
     );
-
+    
+    // Update the car
+    car.update_vehicle(
+        integration_parameters.dt,
+        &mut bodies,
+        &colliders,
+        &query_pipeline,
+        QueryFilter::exclude_dynamic().exclude_rigid_body(car_handle),
+    );
     let car_body = &bodies[car_handle];
 
     let translation = car_body.translation();
