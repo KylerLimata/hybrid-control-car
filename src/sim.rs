@@ -1,10 +1,12 @@
+use std::collections::HashMap;
+
 use libm::atan2;
 use nalgebra::Vector3;
-use pyo3::pyfunction;
+use pyo3::{pyfunction};
 use rapier3d_f64::{control::*, prelude::*};
 
 #[pyfunction]
-pub fn simulate(X0: Vec<f64>, u: Vec<f64>) -> Vec<f64> {
+pub fn simulate(X0: Vec<f64>, u: Vec<f64>, params: HashMap<String, f64>) -> Vec<f64> {
     let gravity = vector![0.0, -9.81, 0.0];
     let mut bodies = RigidBodySet::new();
     let mut colliders = ColliderSet::new();
@@ -22,7 +24,7 @@ pub fn simulate(X0: Vec<f64>, u: Vec<f64>) -> Vec<f64> {
 
     create_floor(&mut bodies, &mut colliders);
 
-    let (mut car, car_handle) = create_car(X0, &mut bodies, &mut colliders);
+    let (mut car, car_handle) = create_car(X0, params, &mut bodies, &mut colliders);
     let wheels = car.wheels_mut();
     let engine_force = u[0];
     let steering_angle = u[1];
@@ -78,8 +80,8 @@ pub fn simulate(X0: Vec<f64>, u: Vec<f64>) -> Vec<f64> {
 }
 
 fn create_floor(bodies: &mut RigidBodySet, colliders: &mut ColliderSet) {
-    let ground_size = 500.0;
-    let ground_height = 0.1;
+    let ground_size = 5000.0;
+    let ground_height = 1.0;
     let rigid_body = RigidBodyBuilder::fixed().translation(vector![0.0, -ground_height, 0.0]);
     let floor_handle = bodies.insert(rigid_body);
     let collider = ColliderBuilder::cuboid(ground_size, ground_height, ground_size);
@@ -87,7 +89,7 @@ fn create_floor(bodies: &mut RigidBodySet, colliders: &mut ColliderSet) {
     colliders.insert_with_parent(collider, floor_handle, bodies);
 }
 
-fn create_car(X0: Vec<f64>, bodies: &mut RigidBodySet, colliders: &mut ColliderSet) -> (DynamicRayCastVehicleController, RigidBodyHandle) {
+fn create_car(X0: Vec<f64>, params: HashMap<String, f64>, bodies: &mut RigidBodySet, colliders: &mut ColliderSet) -> (DynamicRayCastVehicleController, RigidBodyHandle) {
     // Unpack the state vector
     let x0 = X0[0];
     let z0 = X0[1];
@@ -97,16 +99,19 @@ fn create_car(X0: Vec<f64>, bodies: &mut RigidBodySet, colliders: &mut ColliderS
     let w0 = X0[5];
     let phi = atan2(nz0, nx0);
 
+    // Unpack the parameters
+    let m = params.get("m").unwrap();
+    let hw = params.get("hw").unwrap();
+    let hh = params.get("hh").unwrap();
+
     // Create the chassis rigid body
-    let hw = 0.3;
-    let hh = 0.15;
     let rigid_body = RigidBodyBuilder::dynamic()
         .translation(vector![x0, 2.0*hh + hh/4.0, z0])
         .rotation(vector![0.0, phi, 0.0])
         .linvel(vector![v0*nx0, 0.0, v0*nz0])
         .angvel(vector![0.0, w0, 0.0]);
     let car_handle = bodies.insert(rigid_body);
-    let collider = ColliderBuilder::cuboid(hw * 2.0, hh, hw).density(100.0);
+    let collider = ColliderBuilder::cuboid(*hw * 2.0, *hh, *hw).mass(*m);
 
     colliders.insert_with_parent(collider, car_handle, bodies);
 
@@ -118,14 +123,14 @@ fn create_car(X0: Vec<f64>, bodies: &mut RigidBodySet, colliders: &mut ColliderS
         ..WheelTuning::default()
     };
     let wheel_positions = [
-        point![hw * 1.5, -hh, hw],
-        point![hw * 1.5, -hh, -hw],
-        point![-hw * 1.5, -hh, hw],
-        point![-hw * 1.5, -hh, -hw],
+        point![hw * 1.5, -hh, *hw],
+        point![hw * 1.5, -hh, -*hw],
+        point![-hw * 1.5, -hh, *hw],
+        point![-hw * 1.5, -hh, -*hw],
     ];
 
     for pos in wheel_positions {
-        car.add_wheel(pos, -Vector::y(), Vector::z(), hh, hh / 4.0, &tuning);
+        car.add_wheel(pos, -Vector::y(), Vector::z(), *hh, hh / 4.0, &tuning);
     }
 
     return (car, car_handle);

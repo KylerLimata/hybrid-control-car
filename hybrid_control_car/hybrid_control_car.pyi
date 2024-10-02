@@ -1,11 +1,12 @@
 from typing import List, Tuple
 
-def simulate(x0, u):
+def simulate(x0, u, params):
     """
     Simulates the motion of a car
 
     :param x0: The initial state of the car.
     :param u: The control input.
+    :param params: A dictionary of other simulation parameters.
     """
 
 
