@@ -7,10 +7,15 @@ use rapier3d_f64::{control::*, prelude::*};
 
 #[pyfunction]
 pub fn simulate(X0: Vec<f64>, u: Vec<f64>, params: HashMap<String, f64>) -> Vec<f64> {
+    let dt = params.get("dt").unwrap();
+
     let gravity = vector![0.0, -9.81, 0.0];
     let mut bodies = RigidBodySet::new();
     let mut colliders = ColliderSet::new();
-    let integration_parameters = IntegrationParameters::default();
+    let integration_parameters = IntegrationParameters {
+        dt: *dt,
+        ..IntegrationParameters::default()
+    };
     let mut physics_pipeline = PhysicsPipeline::new();
     let mut island_manager = IslandManager::new();
     let mut broad_phase = DefaultBroadPhase::new();
