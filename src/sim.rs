@@ -36,6 +36,8 @@ pub fn simulate(X0: Vec<f64>, u: Vec<f64>, params: HashMap<String, f64>) -> Vec<
     let engine_force = u[0];
     let steering_angle = u[1];
 
+    println!("Engine force = {}", engine_force);
+
     wheels[0].engine_force = engine_force;
     wheels[0].steering = steering_angle;
     wheels[1].engine_force = engine_force;
@@ -105,6 +107,8 @@ fn create_car(X0: Vec<f64>, params: HashMap<String, f64>, bodies: &mut RigidBody
     let v0 = X0[4];
     let w0 = X0[5];
     let phi = atan2(nz0, nx0);
+    let vx0 = if v0 != 0.0 { v0*nx0 } else { 0.0 };
+    let vz0 = if v0 != 0.0 { v0*nz0 } else { 0.0 };
 
     // Unpack the parameters
     let m = params.get("m").unwrap();
@@ -115,7 +119,7 @@ fn create_car(X0: Vec<f64>, params: HashMap<String, f64>, bodies: &mut RigidBody
     let rigid_body = RigidBodyBuilder::dynamic()
         .translation(vector![x0, 2.0*hh + hh/4.0, z0])
         .rotation(vector![0.0, phi, 0.0])
-        .linvel(vector![v0*nx0, 0.0, v0*nz0])
+        .linvel(vector![vx0, 0.0, vz0])
         .angvel(vector![0.0, w0, 0.0]);
     let car_handle = bodies.insert(rigid_body);
     let collider = ColliderBuilder::cuboid(*hw * 2.0, *hh, *hw).mass(*m);
