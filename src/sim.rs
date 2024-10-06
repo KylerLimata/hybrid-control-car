@@ -69,13 +69,10 @@ pub fn simulate(X0: Vec<f64>, u: Vec<f64>, params: HashMap<String, f64>) -> Vec<
     );
     let car_body = &bodies[car_handle];
 
+    // Retrieve the position of the car body
     let translation = car_body.translation();
     let x = translation.x;
     let z = translation.z;
-
-    // Retrieve the forward and angular velocity of the vehicle
-    let v = car.current_vehicle_speed;
-    let w = car_body.angvel().y;
 
     // Calculate the components of the forwards vector.
     let forwards = car_body.position() * Vector3::ith(car.index_forward_axis, 1.0);
@@ -84,6 +81,11 @@ pub fn simulate(X0: Vec<f64>, u: Vec<f64>, params: HashMap<String, f64>) -> Vec<
     );
     let nx = forwards_horiozntal.x;
     let nz = forwards_horiozntal.z;
+
+    // Calculate the forward and angular velocity of the vehicle
+    let linvel = car_body.linvel();
+    let v = f64::sqrt(linvel.x.powi(2) + linvel.z.powi(2));
+    let w = car_body.angvel().y;
 
     return vec![x, z, nx, nz, v, w];
 }
