@@ -15,6 +15,7 @@ pub fn simulate(X0: Vec<f64>, u: Vec<f64>, params: HashMap<String, f64>) -> Vec<
     let mut colliders = ColliderSet::new();
     let integration_parameters = IntegrationParameters {
         dt: *dt,
+        min_ccd_dt: *dt/100.0,
         length_unit: *l,
         ..IntegrationParameters::default()
     };
