@@ -96,7 +96,8 @@ fn create_floor(bodies: &mut RigidBodySet, colliders: &mut ColliderSet) {
     let ground_height = 1.0;
     let rigid_body = RigidBodyBuilder::fixed().translation(vector![0.0, -ground_height, 0.0]);
     let floor_handle = bodies.insert(rigid_body);
-    let collider = ColliderBuilder::cuboid(ground_size, ground_height, ground_size);
+    let collider = ColliderBuilder::cuboid(ground_size, ground_height, ground_size)
+    .friction(0.5);
 
     colliders.insert_with_parent(collider, floor_handle, bodies);
 }
