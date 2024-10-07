@@ -2,11 +2,11 @@ use std::collections::HashMap;
 
 use libm::atan2;
 use nalgebra::Vector3;
-use pyo3::{pyfunction};
+use pyo3::pyfunction;
 use rapier3d_f64::{control::*, prelude::*};
 
 #[pyfunction]
-pub fn simulate(X0: Vec<f64>, u: Vec<f64>, params: HashMap<String, f64>) -> Vec<f64> {
+pub fn simulate(initial_state: Vec<f64>, input: Vec<f64>, params: HashMap<String, f64>) -> Vec<f64> {
     let dt = params.get("dt").unwrap(); // Delta time in seconds per timestep
     let l = params.get("l").unwrap(); // Length unit
 
@@ -32,10 +32,10 @@ pub fn simulate(X0: Vec<f64>, u: Vec<f64>, params: HashMap<String, f64>) -> Vec<
 
     create_floor(&mut bodies, &mut colliders);
 
-    let (mut car, car_handle) = create_car(X0, params, &mut bodies, &mut colliders);
+    let (mut car, car_handle) = create_car(initial_state, params, &mut bodies, &mut colliders);
     let wheels = car.wheels_mut();
-    let engine_force = u[0];
-    let steering_angle = u[1];
+    let engine_force = input[0];
+    let steering_angle = input[1];
 
     println!("Engine force = {}", engine_force);
 
@@ -101,14 +101,14 @@ fn create_floor(bodies: &mut RigidBodySet, colliders: &mut ColliderSet) {
     colliders.insert_with_parent(collider, floor_handle, bodies);
 }
 
-fn create_car(X0: Vec<f64>, params: HashMap<String, f64>, bodies: &mut RigidBodySet, colliders: &mut ColliderSet) -> (DynamicRayCastVehicleController, RigidBodyHandle) {
+fn create_car(initial_state: Vec<f64>, params: HashMap<String, f64>, bodies: &mut RigidBodySet, colliders: &mut ColliderSet) -> (DynamicRayCastVehicleController, RigidBodyHandle) {
     // Unpack the state vector
-    let x0 = X0[0];
-    let z0 = X0[1];
-    let nx0 = X0[2];
-    let nz0 = X0[3];
-    let v0 = X0[4];
-    let w0 = X0[5];
+    let x0 = initial_state[0];
+    let z0 = initial_state[1];
+    let nx0 = initial_state[2];
+    let nz0 = initial_state[3];
+    let v0 = initial_state[4];
+    let w0 = initial_state[5];
     let phi = atan2(nz0, nx0);
     let vx0 = if v0 != 0.0 { v0*nx0 } else { 0.0 };
     let vz0 = if v0 != 0.0 { v0*nz0 } else { 0.0 };
