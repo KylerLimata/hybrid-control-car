@@ -156,7 +156,8 @@ fn create_car(initial_state: Vec<f64>, params: HashMap<String, f64>, bodies: &mu
 
 struct JointCar {
     state: Vec<f64>,
-    chassis_handle: RigidBodyHandle
+    chassis_handle: RigidBodyHandle,
+    wheel_handles: [RigidBodyHandle; 4]
 }
 
 impl JointCar {
@@ -186,14 +187,35 @@ impl JointCar {
             .linear_damping(*zeta);
         let chassis_handle = bodies.insert(chassis_body);
         let chassis_collider = ColliderBuilder::cuboid(hw * 2.0, hh, hw)
-        .mass(*m)
-        .collision_groups(InteractionGroups::new(CAR_GROUP, !CAR_GROUP));
+            .mass(*m)
+            .collision_groups(InteractionGroups::new(CAR_GROUP, !CAR_GROUP));
 
         colliders.insert_with_parent(chassis_collider, chassis_handle, bodies);
+
+        let wheel_positions = [
+            point![hw * 1.5, -hh, hw],
+            point![hw * 1.5, -hh, -hw],
+            point![-hw * 1.5, -hh, hw],
+            point![-hw * 1.5, -hh, -hw],
+        ];
+        let wheel_radius = hh/4.0;
+        let mut wheel_handles = vec![];
         
+        for (id, pos) in wheel_positions.into_iter().enumerate() {
+            let wheel_body = RigidBodyBuilder::dynamic()
+                .position(pos.into())
+                .rotation(vector![std::f64::consts::FRAC_PI_2, 0.0, 0.0]);
+            let wheel_collider = ColliderBuilder::cylinder(0.05, wheel_radius);
+            let wheel_handle = bodies.insert(wheel_body);
+
+            colliders.insert_with_parent(wheel_collider, wheel_handle, bodies);
+            wheel_handles.push(wheel_handle);
+        }
+
         JointCar {
             state: initial_state,
-            chassis_handle
+            chassis_handle,
+            wheel_handles: wheel_handles.try_into().unwrap()
         }
     }
 }
