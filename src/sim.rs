@@ -5,6 +5,8 @@ use nalgebra::Vector3;
 use pyo3::pyfunction;
 use rapier3d_f64::{control::*, prelude::*};
 
+const CAR_GROUP: Group = Group::GROUP_1;
+
 #[pyfunction]
 pub fn simulate(initial_state: Vec<f64>, input: Vec<f64>, params: HashMap<String, f64>) -> Vec<f64> {
     let dt = params.get("dt").unwrap(); // Delta time in seconds per timestep
@@ -60,7 +62,7 @@ pub fn simulate(initial_state: Vec<f64>, input: Vec<f64>, params: HashMap<String
         &event_handler,
     );
     
-    // Update the car
+    // Update the car again
     car.update_vehicle(
         integration_parameters.dt,
         &mut bodies,
@@ -110,23 +112,24 @@ fn create_car(initial_state: Vec<f64>, params: HashMap<String, f64>, bodies: &mu
     let nz0 = initial_state[3];
     let v0 = initial_state[4];
     let w0 = initial_state[5];
-    let phi = atan2(nz0, nx0);
-    let vx0 = if v0 != 0.0 { v0*nx0 } else { 0.0 };
-    let vz0 = if v0 != 0.0 { v0*nz0 } else { 0.0 };
+    let phi0 = atan2(nz0, nx0);
 
     // Unpack the parameters
+    let l = params.get("l").unwrap(); // Length unit
     let m = params.get("m").unwrap();
-    let hw = params.get("hw").unwrap();
-    let hh = params.get("hh").unwrap();
+    let hw = params.get("hw").unwrap()*l;
+    let hh = params.get("hh").unwrap()*l;
+    let zeta = params.get("zeta").unwrap();
 
     // Create the chassis rigid body
     let rigid_body = RigidBodyBuilder::dynamic()
         .translation(vector![x0, 2.0*hh + hh/4.0, z0])
-        .rotation(vector![0.0, phi, 0.0])
-        .linvel(vector![vx0, 0.0, vz0])
-        .angvel(vector![0.0, w0, 0.0]);
+        .rotation(vector![0.0, phi0, 0.0])
+        .linvel(vector![v0*nx0, 0.0, v0*nz0])
+        .angvel(vector![0.0, w0, 0.0])
+        .linear_damping(*zeta);
     let car_handle = bodies.insert(rigid_body);
-    let collider = ColliderBuilder::cuboid(*hw * 2.0, *hh, *hw).mass(*m);
+    let collider = ColliderBuilder::cuboid(hw * 2.0, hh, hw).mass(*m);
 
     colliders.insert_with_parent(collider, car_handle, bodies);
 
@@ -138,15 +141,59 @@ fn create_car(initial_state: Vec<f64>, params: HashMap<String, f64>, bodies: &mu
         ..WheelTuning::default()
     };
     let wheel_positions = [
-        point![hw * 1.5, -hh, *hw],
-        point![hw * 1.5, -hh, -*hw],
-        point![-hw * 1.5, -hh, *hw],
-        point![-hw * 1.5, -hh, -*hw],
+        point![hw * 1.5, -hh, hw],
+        point![hw * 1.5, -hh, -hw],
+        point![-hw * 1.5, -hh, hw],
+        point![-hw * 1.5, -hh, -hw],
     ];
 
     for pos in wheel_positions {
-        car.add_wheel(pos, -Vector::y(), Vector::z(), *hh, hh / 4.0, &tuning);
+        car.add_wheel(pos, -Vector::y(), Vector::z(), hh, hh / 4.0, &tuning);
     }
 
     return (car, car_handle);
+}
+
+struct JointCar {
+    state: Vec<f64>,
+    chassis_handle: RigidBodyHandle
+}
+
+impl JointCar {
+    fn new(initial_state: Vec<f64>, params: HashMap<String, f64>, bodies: &mut RigidBodySet, colliders: &mut ColliderSet) -> Self {
+        // Unpack the state vector
+        let x0 = initial_state[0];
+        let z0 = initial_state[1];
+        let nx0 = initial_state[2];
+        let nz0 = initial_state[3];
+        let v0 = initial_state[4];
+        let w0 = initial_state[5];
+        let phi0 = atan2(nz0, nx0);
+
+        // Unpack the parameters
+        let l = params.get("l").unwrap(); // Length unit
+        let m = params.get("m").unwrap();
+        let hw = params.get("hw").unwrap()*l;
+        let hh = params.get("hh").unwrap()*l;
+        let zeta = params.get("zeta").unwrap();
+
+        // Create the chassis rigid body
+        let chassis_body = RigidBodyBuilder::dynamic()
+            .translation(vector![x0, 2.0*hh + hh/4.0, z0])
+            .rotation(vector![0.0, phi0, 0.0])
+            .linvel(vector![v0*nx0, 0.0, v0*nz0])
+            .angvel(vector![0.0, w0, 0.0])
+            .linear_damping(*zeta);
+        let chassis_handle = bodies.insert(chassis_body);
+        let chassis_collider = ColliderBuilder::cuboid(hw * 2.0, hh, hw)
+        .mass(*m)
+        .collision_groups(InteractionGroups::new(CAR_GROUP, !CAR_GROUP));
+
+        colliders.insert_with_parent(chassis_collider, chassis_handle, bodies);
+        
+        JointCar {
+            state: initial_state,
+            chassis_handle
+        }
+    }
 }
