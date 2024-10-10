@@ -123,11 +123,10 @@ fn create_car(initial_state: Vec<f64>, params: HashMap<String, f64>, bodies: &mu
 
     // Create the chassis rigid body
     let rigid_body = RigidBodyBuilder::dynamic()
-        .translation(vector![x0, 2.0*hh + hh/4.0, z0])
+        .translation(vector![x0, hh + hh/4.0, z0])
         .rotation(vector![0.0, phi0, 0.0])
         .linvel(vector![v0*nx0, 0.0, v0*nz0])
-        .angvel(vector![0.0, w0, 0.0])
-        .linear_damping(*zeta);
+        .angvel(vector![0.0, w0, 0.0]);
     let car_handle = bodies.insert(rigid_body);
     let collider = ColliderBuilder::cuboid(hw * 2.0, hh, hw).mass(*m);
 
