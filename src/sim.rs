@@ -1,7 +1,7 @@
 use std::collections::HashMap;
 
 use libm::atan2;
-use nalgebra::Vector3;
+use nalgebra::{Isometry, Isometry3, Vector3};
 use pyo3::pyfunction;
 use rapier3d_f64::{control::*, prelude::*};
 
@@ -176,36 +176,39 @@ impl JointCar {
         let m = params.get("m").unwrap();
         let hw = params.get("hw").unwrap()*l;
         let hh = params.get("hh").unwrap()*l;
-        let zeta = params.get("zeta").unwrap();
 
         // Create the chassis rigid body
-        let chassis_body = RigidBodyBuilder::dynamic()
-            .translation(vector![x0, 2.0*hh + hh/4.0, z0])
-            .rotation(vector![0.0, phi0, 0.0])
+        let chassis_translation = vector![x0, 2.0*hh + hh/4.0, z0];
+        let chassis_rotation = vector![0.0, phi0, 0.0];
+        let chassis_position = Isometry3::new(chassis_translation, chassis_rotation);
+        let chassis_body_builder = RigidBodyBuilder::dynamic()
+            .position(chassis_position)
             .linvel(vector![v0*nx0, 0.0, v0*nz0])
-            .angvel(vector![0.0, w0, 0.0])
-            .linear_damping(*zeta);
-        let chassis_handle = bodies.insert(chassis_body);
+            .angvel(vector![0.0, w0, 0.0]);
+        let chassis_handle = bodies.insert(chassis_body_builder);
         let chassis_collider = ColliderBuilder::cuboid(hw * 2.0, hh, hw)
             .mass(*m)
             .collision_groups(InteractionGroups::new(CAR_GROUP, !CAR_GROUP));
 
         colliders.insert_with_parent(chassis_collider, chassis_handle, bodies);
 
-        let wheel_positions = [
-            point![hw * 1.5, -hh, hw],
-            point![hw * 1.5, -hh, -hw],
-            point![-hw * 1.5, -hh, hw],
-            point![-hw * 1.5, -hh, -hw],
+        let wheel_offsets = [
+            vector![hw * 1.5, -hh, hw],
+            vector![hw * 1.5, -hh, -hw],
+            vector![-hw * 1.5, -hh, hw],
+            vector![-hw * 1.5, -hh, -hw],
         ];
         let wheel_radius = hh/4.0;
         let mut wheel_handles = vec![];
         
-        for (id, pos) in wheel_positions.into_iter().enumerate() {
+        for (id, offset) in wheel_offsets.into_iter().enumerate() {
+            let wheel_translation = offset + chassis_translation;
             let wheel_body = RigidBodyBuilder::dynamic()
-                .position(pos.into())
-                .rotation(vector![std::f64::consts::FRAC_PI_2, 0.0, 0.0]);
-            let wheel_collider = ColliderBuilder::cylinder(0.05, wheel_radius);
+                .translation(wheel_translation)
+                .rotation(vector![std::f64::consts::FRAC_PI_2, phi0, 0.0]);
+            let wheel_collider = ColliderBuilder::cylinder(0.05, wheel_radius)
+                .friction(1.0)
+                .collision_groups(InteractionGroups::new(CAR_GROUP, !CAR_GROUP));
             let wheel_handle = bodies.insert(wheel_body);
 
             colliders.insert_with_parent(wheel_collider, wheel_handle, bodies);
