@@ -201,7 +201,7 @@ impl JointCar {
         let mut wheel_handles = vec![];
         
         for (id, offset) in wheel_offsets.into_iter().enumerate() {
-            let wheel_translation = offset + chassis_translation;
+            let wheel_translation = chassis_position * offset;
             let wheel_body = RigidBodyBuilder::dynamic()
                 .translation(wheel_translation)
                 .rotation(vector![std::f64::consts::FRAC_PI_2, phi0, 0.0]);
