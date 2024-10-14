@@ -154,6 +154,7 @@ fn create_car(initial_state: Vec<f64>, params: HashMap<String, f64>, bodies: &mu
 }
 
 struct SimulationConfig {
+    pub dt: f64,
     pub units_per_meter: i64,
     pub chassis_mass: f64,
     pub chassis_width: f64,
@@ -166,6 +167,7 @@ struct SimulationConfig {
 impl SimulationConfig {
     fn new() -> Self {
         SimulationConfig {
+            dt: 0.01,
             units_per_meter: 1,
             chassis_mass: 1.0,
             chassis_width: 0.1,
@@ -173,6 +175,49 @@ impl SimulationConfig {
             wheel_mass: 0.01,
             axle_mass: 0.01,
             max_steering_angle: std::f64::consts::PI,
+        }
+    }
+}
+
+struct SimulationEnvironment {
+    config: SimulationConfig,
+    car: Option<Car>,
+    bodies: RigidBodySet,
+    colliders: ColliderSet,
+    gravity: Vector3<f64>,
+    integration_parameters: IntegrationParameters,
+    islands: IslandManager,
+    broad_phase: DefaultBroadPhase,
+    narrow_phase: NarrowPhase, 
+    impulse_joints: ImpulseJointSet,
+    multibody_joints: MultibodyJointSet,
+    ccd_solver: CCDSolver,
+    query_pipeline: QueryPipeline,
+}
+
+impl SimulationEnvironment {
+    fn new(config: SimulationConfig) -> Self {
+        let integration_parameters = IntegrationParameters {
+            dt: config.dt,
+            min_ccd_dt: config.dt/100.0,
+            length_unit: config.units_per_meter as f64,
+            ..IntegrationParameters::default()
+        };
+
+        SimulationEnvironment {
+            config,
+            car: None,
+            bodies: RigidBodySet::new(),
+            colliders: ColliderSet::new(),
+            gravity: vector![0.0, -9.81, 0.0],
+            integration_parameters,
+            islands: IslandManager::new(),
+            broad_phase: BroadPhaseMultiSap::new(),
+            narrow_phase: NarrowPhase::new(),
+            impulse_joints: ImpulseJointSet::new(),
+            multibody_joints: MultibodyJointSet::new(),
+            ccd_solver: CCDSolver::new(),
+            query_pipeline: QueryPipeline::new(),
         }
     }
 }
