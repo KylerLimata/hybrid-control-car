@@ -153,7 +153,7 @@ fn create_car(initial_state: Vec<f64>, params: HashMap<String, f64>, bodies: &mu
     return (car, car_handle);
 }
 
-struct JointCar {
+struct Car {
     state: Vec<f64>,
     chassis_handle: RigidBodyHandle,
     wheels: Vec<RigidBodyHandle>,
@@ -162,7 +162,7 @@ struct JointCar {
     wheel_joints: Vec<ImpulseJointHandle>
 }
 
-impl JointCar {
+impl Car {
     fn new(
         initial_state: Vec<f64>, 
         params: HashMap<String, f64>, 
@@ -271,7 +271,7 @@ impl JointCar {
             wheel_joints.push(wheel_joint_handle);
         }
 
-        JointCar {
+        Car {
             state: initial_state,
             chassis_handle,
             wheels,
