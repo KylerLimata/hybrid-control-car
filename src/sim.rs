@@ -280,4 +280,32 @@ impl Car {
             wheel_joints
         }
     }
+
+    fn apply_inputs(&mut self, input: Vec<f64>, joints: &mut ImpulseJointSet) {
+        let steering_angle = input[0];
+        let rpm = input[1];
+
+        for i in 0..2 {
+            let axle_joint = joints.get_mut(self.axle_joints[i]).unwrap();
+
+            axle_joint.data
+                .set_motor_position(
+                    JointAxis::AngY, 
+                    steering_angle, 
+                    1.0e4, 
+                    1.0e3
+                );
+        }
+
+        for i in 0..2 {
+            let wheel_joint = joints.get_mut(self.wheel_joints[i]).unwrap();
+
+            wheel_joint.data
+                .set_motor_velocity(
+                    JointAxis::AngY, 
+                    rpm,
+                    1.0e2
+                );
+        }
+    }
 }
