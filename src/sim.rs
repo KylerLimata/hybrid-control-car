@@ -308,4 +308,28 @@ impl Car {
                 );
         }
     }
+
+    fn update_state(&mut self, bodies: &mut RigidBodySet) {
+        let chassis = &bodies[self.chassis_handle];
+
+        // Retrieve the position of the car body
+        let translation = chassis.translation();
+        let x = translation.x;
+        let z = translation.z;
+
+        // Calculate the components of the forwards vector.
+        let forwards = chassis.position() * Vector3::ith(0, 1.0);
+        let forwards_horiozntal = UnitVector::new_normalize(
+            vector![forwards.x, 0.0, forwards.z]
+        );
+        let nx = forwards_horiozntal.x;
+        let nz = forwards_horiozntal.z;
+
+        // Calculate the forward and angular velocity of the vehicle
+        let linvel = chassis.linvel();
+        let v = f64::sqrt(linvel.x.powi(2) + linvel.z.powi(2));
+        let w = chassis.angvel().y;
+
+        self.state = vec![x, z, nx, nz, v, w];
+    }
 }
