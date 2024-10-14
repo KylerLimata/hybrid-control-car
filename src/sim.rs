@@ -156,11 +156,20 @@ fn create_car(initial_state: Vec<f64>, params: HashMap<String, f64>, bodies: &mu
 struct JointCar {
     state: Vec<f64>,
     chassis_handle: RigidBodyHandle,
-    wheel_handles: [RigidBodyHandle; 4]
+    wheels: Vec<RigidBodyHandle>,
+    axles: Vec<RigidBodyHandle>,
+    axle_joints: Vec<ImpulseJointHandle>,
+    wheel_joints: Vec<ImpulseJointHandle>
 }
 
 impl JointCar {
-    fn new(initial_state: Vec<f64>, params: HashMap<String, f64>, bodies: &mut RigidBodySet, colliders: &mut ColliderSet) -> Self {
+    fn new(
+        initial_state: Vec<f64>, 
+        params: HashMap<String, f64>, 
+        bodies: &mut RigidBodySet, 
+        colliders: &mut ColliderSet,
+        impulse_joints: &mut ImpulseJointSet
+    ) -> Self {
         // Unpack the state vector
         let x0 = initial_state[0];
         let z0 = initial_state[1];
@@ -198,26 +207,77 @@ impl JointCar {
             vector![-hw * 1.5, -hh, -hw],
         ];
         let wheel_radius = hh/4.0;
-        let mut wheel_handles = vec![];
+        let mut wheels = vec![];
+        let mut axles = vec![];
+        let mut axle_joints = vec![];
+        let mut wheel_joints = vec![];
         
         for (id, offset) in wheel_offsets.into_iter().enumerate() {
+            let is_front = id < 2;
+
+            // Create the wheel
             let wheel_translation = chassis_position * offset;
             let wheel_body = RigidBodyBuilder::dynamic()
                 .translation(wheel_translation)
                 .rotation(vector![std::f64::consts::FRAC_PI_2, phi0, 0.0]);
             let wheel_collider = ColliderBuilder::cylinder(0.05, wheel_radius)
                 .friction(1.0)
-                .collision_groups(InteractionGroups::new(CAR_GROUP, !CAR_GROUP));
+                .collision_groups(InteractionGroups::new(CAR_GROUP, !CAR_GROUP))
+                .mass(0.05);
             let wheel_handle = bodies.insert(wheel_body);
 
             colliders.insert_with_parent(wheel_collider, wheel_handle, bodies);
-            wheel_handles.push(wheel_handle);
+            wheels.push(wheel_handle);
+            
+            // Create the "axle"
+            let axle_body = RigidBodyBuilder::dynamic()
+                .translation(wheel_translation)
+                .additional_mass(0.05);
+
+            let axle_handle = bodies.insert(axle_body);
+
+            axles.push(axle_handle);
+
+            // Joint between the chassis and the axle
+            let mut locked_axes = JointAxesMask::LIN_AXES
+                | JointAxesMask::ANG_X
+                | JointAxesMask::ANG_Z;
+
+            if !is_front {
+                locked_axes = locked_axes | JointAxesMask::ANG_Y
+            }
+
+            let mut axle_joint = GenericJointBuilder::new(locked_axes)
+                .motor_position(JointAxis::LinY, 0.0, 1.0e4, 1.0e3)
+                .local_anchor1(point![offset.x, -hh, offset.z]);
+
+            if is_front {
+                axle_joint = axle_joint.limits(JointAxis::AngY, [-0.7, 0.7]);
+            }
+
+            let steering_joint_handle = impulse_joints.insert(
+                chassis_handle, 
+                axle_handle,
+                axle_joint,
+                true
+            );
+
+            axle_joints.push(steering_joint_handle);
+
+            // Joint between the axle and the wheel
+            let wheel_joint = RevoluteJointBuilder::new(Vector3::z_axis());
+            let wheel_joint_handle = impulse_joints.insert(axle_handle, wheel_handle, wheel_joint, true);
+
+            wheel_joints.push(wheel_joint_handle);
         }
 
         JointCar {
             state: initial_state,
             chassis_handle,
-            wheel_handles: wheel_handles.try_into().unwrap()
+            wheels,
+            axles,
+            axle_joints,
+            wheel_joints
         }
     }
 }
