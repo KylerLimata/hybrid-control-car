@@ -353,4 +353,34 @@ impl Car {
 
         self.state = vec![x, z, nx, nz, v, w];
     }
+    
+    fn remove(&mut self, bodies: &mut RigidBodySet, colliders: &mut ColliderSet, islands: &mut IslandManager, impulse_joints: &mut ImpulseJointSet, multibody_joints: &mut MultibodyJointSet) {
+        for i in 0..4 {            
+            bodies.remove(
+                self.wheels[i], 
+                islands, 
+                colliders, 
+                impulse_joints, 
+                multibody_joints, 
+                true
+            );
+            bodies.remove(
+                self.axles[i], 
+                islands, 
+                colliders, 
+                impulse_joints, 
+                multibody_joints, 
+                true
+            );
+        }
+
+        bodies.remove(
+            self.chassis_handle, 
+            islands, 
+            colliders, 
+            impulse_joints, 
+            multibody_joints, 
+            true
+        );
+    }
 }
