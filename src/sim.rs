@@ -153,6 +153,30 @@ fn create_car(initial_state: Vec<f64>, params: HashMap<String, f64>, bodies: &mu
     return (car, car_handle);
 }
 
+struct SimulationConfig {
+    pub units_per_meter: i64,
+    pub chassis_mass: f64,
+    pub chassis_width: f64,
+    pub chassis_height: f64,
+    pub wheel_mass: f64,
+    pub axle_mass: f64,
+    pub max_steering_angle: f64,
+}
+
+impl SimulationConfig {
+    fn new() -> Self {
+        SimulationConfig {
+            units_per_meter: 1,
+            chassis_mass: 1.0,
+            chassis_width: 0.1,
+            chassis_height: 0.1,
+            wheel_mass: 0.01,
+            axle_mass: 0.01,
+            max_steering_angle: std::f64::consts::PI,
+        }
+    }
+}
+
 struct Car {
     state: Vec<f64>,
     chassis_handle: RigidBodyHandle,
@@ -163,13 +187,7 @@ struct Car {
 }
 
 impl Car {
-    fn new(
-        initial_state: Vec<f64>, 
-        params: HashMap<String, f64>, 
-        bodies: &mut RigidBodySet, 
-        colliders: &mut ColliderSet,
-        impulse_joints: &mut ImpulseJointSet
-    ) -> Self {
+    fn new(initial_state: Vec<f64>, config: &SimulationConfig, bodies: &mut RigidBodySet, colliders: &mut ColliderSet, impulse_joints: &mut ImpulseJointSet) -> Self {
         // Unpack the state vector
         let x0 = initial_state[0];
         let z0 = initial_state[1];
@@ -180,10 +198,9 @@ impl Car {
         let phi0 = atan2(nz0, nx0);
 
         // Unpack the parameters
-        let l = params.get("l").unwrap(); // Length unit
-        let m = params.get("m").unwrap();
-        let hw = params.get("hw").unwrap()*l;
-        let hh = params.get("hh").unwrap()*l;
+        let l = config.units_per_meter as f64;
+        let hw = config.chassis_width/2.0*l;
+        let hh = config.chassis_height/2.0*l;
 
         // Create the chassis rigid body
         let chassis_translation = vector![x0, 2.0*hh + hh/4.0, z0];
@@ -195,7 +212,7 @@ impl Car {
             .angvel(vector![0.0, w0, 0.0]);
         let chassis_handle = bodies.insert(chassis_body_builder);
         let chassis_collider = ColliderBuilder::cuboid(hw * 2.0, hh, hw)
-            .mass(*m)
+            .mass(config.chassis_mass)
             .collision_groups(InteractionGroups::new(CAR_GROUP, !CAR_GROUP));
 
         colliders.insert_with_parent(chassis_collider, chassis_handle, bodies);
@@ -223,7 +240,7 @@ impl Car {
             let wheel_collider = ColliderBuilder::cylinder(0.05, wheel_radius)
                 .friction(1.0)
                 .collision_groups(InteractionGroups::new(CAR_GROUP, !CAR_GROUP))
-                .mass(0.05);
+                .mass(config.wheel_mass);
             let wheel_handle = bodies.insert(wheel_body);
 
             colliders.insert_with_parent(wheel_collider, wheel_handle, bodies);
@@ -232,7 +249,8 @@ impl Car {
             // Create the "axle"
             let axle_body = RigidBodyBuilder::dynamic()
                 .translation(wheel_translation)
-                .additional_mass(0.05);
+                .additional_mass(config.axle_mass);
+            
 
             let axle_handle = bodies.insert(axle_body);
 
@@ -252,7 +270,10 @@ impl Car {
                 .local_anchor1(point![offset.x, -hh, offset.z]);
 
             if is_front {
-                axle_joint = axle_joint.limits(JointAxis::AngY, [-0.7, 0.7]);
+                axle_joint = axle_joint.limits(
+                    JointAxis::AngY, 
+                    [-config.max_steering_angle, config.max_steering_angle]
+                );
             }
 
             let steering_joint_handle = impulse_joints.insert(
