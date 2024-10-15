@@ -182,6 +182,7 @@ impl SimulationConfig {
 struct SimulationEnvironment {
     config: SimulationConfig,
     car: Option<Car>,
+    physics_pipeline: PhysicsPipeline,
     bodies: RigidBodySet,
     colliders: ColliderSet,
     gravity: Vector3<f64>,
@@ -207,6 +208,7 @@ impl SimulationEnvironment {
         SimulationEnvironment {
             config,
             car: None,
+            physics_pipeline: PhysicsPipeline::new(),
             bodies: RigidBodySet::new(),
             colliders: ColliderSet::new(),
             gravity: vector![0.0, -9.81, 0.0],
@@ -219,6 +221,57 @@ impl SimulationEnvironment {
             ccd_solver: CCDSolver::new(),
             query_pipeline: QueryPipeline::new(),
         }
+    }
+
+    fn step(&mut self, initial_state: Vec<f64>, input: Vec<f64>) -> Vec<f64> {
+        // Ensure passed initial state and input are of the right size
+        if initial_state.len() != 6 {
+            panic!("State vec should be of size 6.")
+        }
+        if input.len() != 2 {
+            panic!("Input vec should be of size 2.")
+        }
+
+        if let None = self.car {
+            self.car = Some(Car::new(
+                initial_state, 
+                &self.config, 
+                &mut self.bodies, 
+                &mut self.colliders, 
+                &mut self.impulse_joints
+            ));
+        }
+
+        if let Some(car) = &mut self.car {
+            car.apply_inputs(input, &mut self.impulse_joints);
+        }
+
+        let physics_hooks = ();
+        let event_handler = ();
+
+        self.physics_pipeline.step(
+            &vector![0.0, -9.81, 0.0],
+            &self.integration_parameters,
+            &mut self.islands,
+            &mut self.broad_phase,
+            &mut self.narrow_phase,
+            &mut self.bodies,
+            &mut self.colliders,
+            &mut self.impulse_joints,
+            &mut self.multibody_joints,
+            &mut self.ccd_solver,
+            Some(&mut self.query_pipeline),
+            &physics_hooks,
+            &event_handler,
+        );
+
+        if let Some(car) = &mut self.car {
+            car.update_state(&mut self.bodies);
+
+            return car.state.clone();
+        }
+
+        panic!("Somehow, the car vanished")
     }
 }
 
@@ -347,12 +400,12 @@ impl Car {
         }
     }
 
-    fn apply_inputs(&mut self, input: Vec<f64>, joints: &mut ImpulseJointSet) {
+    fn apply_inputs(&mut self, input: Vec<f64>, impulse_joints: &mut ImpulseJointSet) {
         let steering_angle = input[0];
         let rpm = input[1];
 
         for i in 0..2 {
-            let axle_joint = joints.get_mut(self.axle_joints[i]).unwrap();
+            let axle_joint = impulse_joints.get_mut(self.axle_joints[i]).unwrap();
 
             axle_joint.data
                 .set_motor_position(
@@ -364,7 +417,7 @@ impl Car {
         }
 
         for i in 0..2 {
-            let wheel_joint = joints.get_mut(self.wheel_joints[i]).unwrap();
+            let wheel_joint = impulse_joints.get_mut(self.wheel_joints[i]).unwrap();
 
             wheel_joint.data
                 .set_motor_velocity(
