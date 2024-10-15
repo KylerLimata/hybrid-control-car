@@ -232,7 +232,17 @@ impl SimulationEnvironment {
             panic!("Input vec should be of size 2.")
         }
 
-        if let None = self.car {
+        let mut should_replace = false;
+
+        if let Some(car) = &self.car {
+            for i in 0..6 {
+                if (initial_state[i] - car.state[i]).abs() > 1e-3 {
+                    should_replace = true;
+                }
+            }
+        }
+
+        if should_replace || self.car.is_none() {
             self.car = Some(Car::new(
                 initial_state, 
                 &self.config, 
