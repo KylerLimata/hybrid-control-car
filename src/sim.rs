@@ -2,7 +2,7 @@ use std::collections::HashMap;
 
 use libm::atan2;
 use nalgebra::{Isometry, Isometry3, Vector3};
-use pyo3::pyfunction;
+use pyo3::{pyclass, pyfunction, pymethods};
 use rapier3d_f64::{control::*, prelude::*};
 
 const CAR_GROUP: Group = Group::GROUP_1;
@@ -153,18 +153,30 @@ fn create_car(initial_state: Vec<f64>, params: HashMap<String, f64>, bodies: &mu
     return (car, car_handle);
 }
 
-struct SimulationConfig {
+#[pyclass]
+#[derive(Clone)]
+pub struct SimulationConfig {
+    #[pyo3(get, set)]
     pub dt: f64,
+    #[pyo3(get, set)]
     pub units_per_meter: i64,
+    #[pyo3(get, set)]
     pub chassis_mass: f64,
+    #[pyo3(get, set)]
     pub chassis_width: f64,
+    #[pyo3(get, set)]
     pub chassis_height: f64,
+    #[pyo3(get, set)]
     pub wheel_mass: f64,
+    #[pyo3(get, set)]
     pub axle_mass: f64,
+    #[pyo3(get, set)]
     pub max_steering_angle: f64,
 }
 
+#[pymethods]
 impl SimulationConfig {
+    #[new]
     fn new() -> Self {
         SimulationConfig {
             dt: 0.01,
@@ -179,7 +191,8 @@ impl SimulationConfig {
     }
 }
 
-struct SimulationEnvironment {
+#[pyclass]
+pub struct SimulationEnvironment {
     config: SimulationConfig,
     car: Option<Car>,
     physics_pipeline: PhysicsPipeline,
@@ -196,7 +209,9 @@ struct SimulationEnvironment {
     query_pipeline: QueryPipeline,
 }
 
+#[pymethods]
 impl SimulationEnvironment {
+    #[new]
     fn new(config: SimulationConfig) -> Self {
         let integration_parameters = IntegrationParameters {
             dt: config.dt,
@@ -260,7 +275,7 @@ impl SimulationEnvironment {
         let event_handler = ();
 
         self.physics_pipeline.step(
-            &vector![0.0, -9.81, 0.0],
+            &self.gravity,
             &self.integration_parameters,
             &mut self.islands,
             &mut self.broad_phase,

@@ -40,3 +40,17 @@ class CarSimulation:
             checkpoint Is whether the car has reached a checkpoint
             finish Is whether the car has reached the finish line
         """
+
+class SimulationConfig:
+    """
+    Config for a simulation environment
+    """
+
+class SimulationEnvironment:
+    """
+    Simulation environment
+    """
+
+    def __init__(self, config: SimulationConfig): ...
+
+    def step(x0, u): ...
