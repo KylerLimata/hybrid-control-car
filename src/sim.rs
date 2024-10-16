@@ -258,13 +258,21 @@ impl SimulationEnvironment {
         }
 
         if should_replace || self.car.is_none() {
-            self.car = Some(Car::new(
+            if let Some(car) = &mut self.car.replace(Car::new(
                 initial_state, 
                 &self.config, 
                 &mut self.bodies, 
                 &mut self.colliders, 
                 &mut self.impulse_joints
-            ));
+            )) {
+                car.remove(
+                    &mut self.bodies, 
+                    &mut self.colliders, 
+                    &mut self.islands, 
+                    &mut self.impulse_joints, 
+                    &mut self.multibody_joints
+                );
+            }
         }
 
         if let Some(car) = &mut self.car {
