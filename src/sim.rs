@@ -329,9 +329,9 @@ impl Car {
         let phi0 = atan2(nz0, nx0);
 
         // Unpack the parameters
-        let l = config.units_per_meter as f64;
-        let hw = config.chassis_width/2.0*l;
-        let hh = config.chassis_height/2.0*l;
+        // let l = config.units_per_meter as f64;
+        let hw = config.chassis_width/2.0;
+        let hh = config.chassis_height/2.0;
 
         // Create the chassis rigid body
         let chassis_translation = vector![x0, 2.0*hh + hh/4.0, z0];
@@ -454,7 +454,7 @@ impl Car {
 
             wheel_joint.data
                 .set_motor_velocity(
-                    JointAxis::AngY, 
+                    JointAxis::AngZ, 
                     rpm,
                     1.0e2
                 );
