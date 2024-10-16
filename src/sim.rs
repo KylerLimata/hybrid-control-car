@@ -434,8 +434,8 @@ impl Car {
     }
 
     fn apply_inputs(&mut self, input: Vec<f64>, impulse_joints: &mut ImpulseJointSet) {
-        let steering_angle = input[0];
-        let rpm = input[1];
+        let steering_angle = input[1];
+        let rpm = input[0];
 
         for i in 0..2 {
             let axle_joint = impulse_joints.get_mut(self.axle_joints[i]).unwrap();
