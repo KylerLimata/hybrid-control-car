@@ -99,7 +99,7 @@ fn create_floor(bodies: &mut RigidBodySet, colliders: &mut ColliderSet) {
     let rigid_body = RigidBodyBuilder::fixed().translation(vector![0.0, -ground_height, 0.0]);
     let floor_handle = bodies.insert(rigid_body);
     let collider = ColliderBuilder::cuboid(ground_size, ground_height, ground_size)
-    .friction(0.5);
+    .friction(1.0);
 
     colliders.insert_with_parent(collider, floor_handle, bodies);
 }
@@ -219,13 +219,17 @@ impl SimulationEnvironment {
             length_unit: config.units_per_meter as f64,
             ..IntegrationParameters::default()
         };
+        let mut bodies = RigidBodySet::new();
+        let mut colliders = ColliderSet::new();
+
+        create_floor(&mut bodies, &mut colliders);
 
         SimulationEnvironment {
             config,
             car: None,
             physics_pipeline: PhysicsPipeline::new(),
-            bodies: RigidBodySet::new(),
-            colliders: ColliderSet::new(),
+            bodies: bodies,
+            colliders: colliders,
             gravity: vector![0.0, -9.81, 0.0],
             integration_parameters,
             islands: IslandManager::new(),
@@ -301,6 +305,11 @@ impl SimulationEnvironment {
         if let Some(car) = &mut self.car {
             car.update_state(&mut self.bodies);
 
+            let chassis_body = self.bodies.get(car.chassis_handle).unwrap();
+            let hh = self.config.chassis_height/2.0;
+
+            assert!(chassis_body.translation().y > 0.0);
+
             return car.state.clone();
         }
 
@@ -334,7 +343,7 @@ impl Car {
         let hh = config.chassis_height/2.0;
 
         // Create the chassis rigid body
-        let chassis_translation = vector![x0, 2.0*hh + hh/4.0, z0];
+        let chassis_translation = vector![x0, hh + hh/4.0, z0];
         let chassis_rotation = vector![0.0, phi0, 0.0];
         let chassis_position = Isometry3::new(chassis_translation, chassis_rotation);
         let chassis_body_builder = RigidBodyBuilder::dynamic()
@@ -367,8 +376,8 @@ impl Car {
             let wheel_translation = chassis_position * offset;
             let wheel_body = RigidBodyBuilder::dynamic()
                 .translation(wheel_translation)
-                .rotation(vector![std::f64::consts::FRAC_PI_2, phi0, 0.0]);
-            let wheel_collider = ColliderBuilder::cylinder(0.05, wheel_radius)
+                .rotation(vector![0.0, phi0, 0.0]);
+            let wheel_collider = ColliderBuilder::ball(wheel_radius)
                 .friction(1.0)
                 .collision_groups(InteractionGroups::new(CAR_GROUP, !CAR_GROUP))
                 .mass(config.wheel_mass);
