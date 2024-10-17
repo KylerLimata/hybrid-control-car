@@ -193,6 +193,5 @@ fn hybrid_control_car(module: &Bound<'_, PyModule>) -> PyResult<()> {
     module.add_class::<CarSimulation>()?;
     module.add_class::<SimulationConfig>()?;
     module.add_class::<SimulationEnvironment>()?;
-    let _ = module.add_function(wrap_pyfunction!(sim::simulate, module)?);
     Ok(())
 }
