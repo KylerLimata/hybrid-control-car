@@ -359,7 +359,8 @@ impl Car {
         let chassis_body_builder = RigidBodyBuilder::dynamic()
             .position(chassis_isometry)
             .linvel(vector![v0*nx0, 0.0, v0*nz0])
-            .angvel(vector![0.0, w0, 0.0]);
+            .angvel(vector![0.0, w0, 0.0])
+            .can_sleep(false);
         let chassis_handle = bodies.insert(chassis_body_builder);
         let chassis_collider = ColliderBuilder::cuboid(hw * 2.0, hh, hw)
             .mass(config.chassis_mass)
@@ -386,7 +387,8 @@ impl Car {
             let wheel_translation = (car_isometry * offset) + car_translation;
             
             let wheel_body = RigidBodyBuilder::dynamic()
-                .translation(wheel_translation);
+                .translation(wheel_translation)
+                .can_sleep(false);
             let wheel_collider = ColliderBuilder::ball(wheel_radius)
                 .friction(1.0)
                 .collision_groups(InteractionGroups::new(CAR_GROUP, !CAR_GROUP))
@@ -403,7 +405,6 @@ impl Car {
                 .translation(wheel_translation)
                 .additional_mass(config.axle_mass);
             
-
             let axle_handle = bodies.insert(axle_body);
 
             axles.push(axle_handle);
