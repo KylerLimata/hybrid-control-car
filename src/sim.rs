@@ -1,4 +1,4 @@
-use std::collections::HashMap;
+use std::{borrow::Borrow, collections::HashMap};
 
 use libm::atan2;
 use nalgebra::{Isometry, Isometry3, Vector3};
@@ -351,7 +351,8 @@ impl Car {
         );
 
         // Create the chassis rigid body
-        let chassis_translation = car_translation + vector![0.0, hh + hh/4.0, 0.0];
+        let chassis_offset = vector![0.0, hh + hh/4.0, 0.0];
+        let chassis_translation = chassis_offset + car_translation;
         let chassis_isometry = Isometry3::new(
             chassis_translation,
             car_axisangle
@@ -360,6 +361,11 @@ impl Car {
             .position(chassis_isometry)
             .linvel(vector![v0*nx0, 0.0, v0*nz0])
             .angvel(vector![0.0, w0, 0.0])
+            .enabled_rotations(
+                false, 
+                true, 
+                false
+            )
             .can_sleep(false);
         let chassis_handle = bodies.insert(chassis_body_builder);
         let chassis_collider = ColliderBuilder::cuboid(hw * 2.0, hh, hw)
@@ -367,6 +373,7 @@ impl Car {
             .collision_groups(InteractionGroups::new(CAR_GROUP, !CAR_GROUP));
 
         colliders.insert_with_parent(chassis_collider, chassis_handle, bodies);
+        assert!(chassis_translation.y == hh + hh/4.0);
 
         let wheel_radius = hh/4.0;
         let wheel_offsets = [
@@ -397,14 +404,11 @@ impl Car {
 
             colliders.insert_with_parent(wheel_collider, wheel_handle, bodies);
             wheels.push(wheel_handle);
-
-            assert!(wheel_translation.y == wheel_radius);
             
             // Create the "axle"
             let axle_body = RigidBodyBuilder::dynamic()
                 .translation(wheel_translation)
                 .additional_mass(config.axle_mass);
-            
             let axle_handle = bodies.insert(axle_body);
 
             axles.push(axle_handle);
@@ -418,9 +422,10 @@ impl Car {
                 locked_axes = locked_axes | JointAxesMask::ANG_Y
             }
 
+            let axle_joint_attachment = offset - chassis_offset;
             let mut axle_joint = GenericJointBuilder::new(locked_axes)
                 .motor_position(JointAxis::LinY, 0.0, 1.0e4, 1.0e3)
-                .local_anchor1(point![offset.x, -hh, offset.z]);
+                .local_anchor1(axle_joint_attachment.into());
 
             if is_front {
                 axle_joint = axle_joint.limits(
@@ -429,14 +434,14 @@ impl Car {
                 );
             }
 
-            let steering_joint_handle = impulse_joints.insert(
+            let axle_joint_handle = impulse_joints.insert(
                 chassis_handle, 
                 axle_handle,
                 axle_joint,
                 true
             );
 
-            axle_joints.push(steering_joint_handle);
+            axle_joints.push(axle_joint_handle);
 
             // Joint between the axle and the wheel
             let wheel_joint = RevoluteJointBuilder::new(Vector3::z_axis());
@@ -494,11 +499,8 @@ impl Car {
 
         // Calculate the components of the forwards vector.
         let forwards = chassis.position() * Vector3::x_axis();
-        let forwards_horiozntal = UnitVector::new_normalize(
-            vector![forwards.x, 0.0, forwards.z]
-        );
-        let nx = forwards_horiozntal.x;
-        let nz = forwards_horiozntal.z;
+        let nx = forwards.x;
+        let nz = forwards.z;
 
         // Calculate the forward and angular velocity of the vehicle
         let linvel = chassis.linvel();
