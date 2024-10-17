@@ -1,7 +1,7 @@
-use std::{borrow::Borrow, collections::HashMap};
+use std::collections::HashMap;
 
 use libm::atan2;
-use nalgebra::{Isometry, Isometry3, Vector3};
+use nalgebra::{Isometry3, Vector3};
 use pyo3::{pyclass, pyfunction, pymethods};
 use rapier3d_f64::{control::*, prelude::*};
 
@@ -119,7 +119,6 @@ fn create_car(initial_state: Vec<f64>, params: HashMap<String, f64>, bodies: &mu
     let m = params.get("m").unwrap();
     let hw = params.get("hw").unwrap()*l;
     let hh = params.get("hh").unwrap()*l;
-    let zeta = params.get("zeta").unwrap();
 
     // Create the chassis rigid body
     let rigid_body = RigidBodyBuilder::dynamic()
@@ -308,7 +307,7 @@ impl SimulationEnvironment {
             let chassis_body = self.bodies.get(car.chassis_handle).unwrap();
             let hh = self.config.chassis_height/2.0;
 
-            assert!(chassis_body.translation().y > 0.0);
+            assert!(chassis_body.translation().y == hh + hh/4.0);
 
             return car.state.clone();
         }
