@@ -342,12 +342,22 @@ impl Car {
         let hw = config.chassis_width/2.0;
         let hh = config.chassis_height/2.0;
 
+        // Calculate the initial position of the vehicle (translation + rotation)
+        let car_translation = vector![x0, 0.0, z0];
+        let car_axisangle = vector![0.0, phi0, 0.0];
+        let car_isometry = Isometry3::new(
+            car_translation,
+            car_axisangle
+        );
+
         // Create the chassis rigid body
-        let chassis_translation = vector![x0, hh + hh/4.0, z0];
-        let chassis_rotation = vector![0.0, phi0, 0.0];
-        let chassis_position = Isometry3::new(chassis_translation, chassis_rotation);
+        let chassis_translation = car_translation + vector![0.0, hh + hh/4.0, 0.0];
+        let chassis_isometry = Isometry3::new(
+            chassis_translation,
+            car_axisangle
+        );
         let chassis_body_builder = RigidBodyBuilder::dynamic()
-            .position(chassis_position)
+            .position(chassis_isometry)
             .linvel(vector![v0*nx0, 0.0, v0*nz0])
             .angvel(vector![0.0, w0, 0.0]);
         let chassis_handle = bodies.insert(chassis_body_builder);
@@ -357,13 +367,13 @@ impl Car {
 
         colliders.insert_with_parent(chassis_collider, chassis_handle, bodies);
 
-        let wheel_offsets = [
-            vector![hw * 1.5, -hh, hw],
-            vector![hw * 1.5, -hh, -hw],
-            vector![-hw * 1.5, -hh, hw],
-            vector![-hw * 1.5, -hh, -hw],
-        ];
         let wheel_radius = hh/4.0;
+        let wheel_offsets = [
+            vector![hw * 1.5, wheel_radius, hw],
+            vector![hw * 1.5, wheel_radius, -hw],
+            vector![-hw * 1.5, wheel_radius, hw],
+            vector![-hw * 1.5, wheel_radius, -hw],
+        ];
         let mut wheels = vec![];
         let mut axles = vec![];
         let mut axle_joints = vec![];
@@ -373,10 +383,10 @@ impl Car {
             let is_front = id < 2;
 
             // Create the wheel
-            let wheel_translation = chassis_position * offset;
+            let wheel_translation = (car_isometry * offset) + car_translation;
+            
             let wheel_body = RigidBodyBuilder::dynamic()
-                .translation(wheel_translation)
-                .rotation(vector![0.0, phi0, 0.0]);
+                .translation(wheel_translation);
             let wheel_collider = ColliderBuilder::ball(wheel_radius)
                 .friction(1.0)
                 .collision_groups(InteractionGroups::new(CAR_GROUP, !CAR_GROUP))
@@ -385,6 +395,8 @@ impl Car {
 
             colliders.insert_with_parent(wheel_collider, wheel_handle, bodies);
             wheels.push(wheel_handle);
+
+            assert!(wheel_translation.y == wheel_radius);
             
             // Create the "axle"
             let axle_body = RigidBodyBuilder::dynamic()
@@ -443,17 +455,18 @@ impl Car {
     }
 
     fn apply_inputs(&mut self, input: Vec<f64>, impulse_joints: &mut ImpulseJointSet) {
-        let steering_angle = input[1];
         let rpm = input[0];
+        let steering_angle = input[1];
+        
 
         for i in 0..2 {
             let axle_joint = impulse_joints.get_mut(self.axle_joints[i]).unwrap();
 
             axle_joint.data
                 .set_motor_position(
-                    JointAxis::AngY, 
+                    JointAxis::AngY,
                     steering_angle, 
-                    1.0e4, 
+                    1.0e4,
                     1.0e3
                 );
         }
@@ -479,7 +492,7 @@ impl Car {
         let z = translation.z;
 
         // Calculate the components of the forwards vector.
-        let forwards = chassis.position() * Vector3::ith(0, 1.0);
+        let forwards = chassis.position() * Vector3::x_axis();
         let forwards_horiozntal = UnitVector::new_normalize(
             vector![forwards.x, 0.0, forwards.z]
         );
