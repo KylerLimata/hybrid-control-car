@@ -125,7 +125,7 @@ impl SimulationEnvironment {
         }
 
         if should_replace || self.car.is_none() {
-            let placement_offset = 0.001;
+            let placement_offset = 0.0;
 
             if let Some(car) = &mut self.car.replace(Car::new(
                 initial_state,
@@ -144,11 +144,34 @@ impl SimulationEnvironment {
                 );
             }
 
+            /*
+            if let Some(car) = &mut self.car {
+                let chassis = self.bodies.get_mut(car.chassis_handle).unwrap();
+                let locked_axes = LockedAxes::TRANSLATION_LOCKED_X
+                    | LockedAxes::TRANSLATION_LOCKED_Z
+                    | LockedAxes::ROTATION_LOCKED;
+
+                chassis.set_locked_axes(locked_axes, true);
+
+                /*
+                while chassis.translation().y - (hh + hh/4.0) > 0.0 {
+                    self.step_pipeline();
+                }
+                */
+            }
+
             // The car is placed above the floor to avoid clipping through it,
             // so we need to use Rapier to place the car on the floor.
-            for _ in 0..10 {
+            for _ in 0..100 {
                 self.step_pipeline();
             }
+
+            if let Some(car) = &mut self.car {
+                let chassis = self.bodies.get_mut(car.chassis_handle).unwrap();
+
+                chassis.set_locked_axes(LockedAxes::empty(), true);
+            }
+            */
         }
 
         if let Some(car) = &mut self.car {
@@ -159,16 +182,6 @@ impl SimulationEnvironment {
 
         if let Some(car) = &mut self.car {
             car.update_state(&self.config, &mut self.bodies);
-
-            // Ensure that the car isn't falling.
-            let chassis_body = self.bodies.get(car.chassis_handle).unwrap();
-            let hh = self.config.chassis_height/2.0;
-            let y = chassis_body.translation().y;
-            let y_desired = hh + hh/4.0;
-
-            // If the first assert fails, the car is falling through the floor. If the second one fails, it's rising.
-            // assert!(y_desired - y <= 1e-6);
-            // assert!(y - y_desired <= 1e-6);
 
             return car.state.clone();
         }
@@ -242,11 +255,6 @@ impl Car {
             .position(chassis_isometry)
             .linvel(vector![v0*nx0, 0.0, v0*nz0])
             .angvel(vector![0.0, w0, 0.0])
-            .enabled_rotations(
-                false, 
-                true, 
-                false
-            )
             .can_sleep(false);
         let chassis_handle = bodies.insert(chassis_body_builder);
         let chassis_collider = ColliderBuilder::cuboid(hw * 2.0, hh, hw)
@@ -377,7 +385,7 @@ impl Car {
         // Retrieve the position of the car body
         let translation = chassis.translation();
         let x = translation.x;
-        let y = chassis.translation().y - (hh + hh/4.0);
+        let y = translation.y - (hh + hh/4.0);
         let z = translation.z;
 
         // Calculate the components of the forwards vector.
