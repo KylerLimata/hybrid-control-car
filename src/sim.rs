@@ -107,8 +107,8 @@ impl SimulationEnvironment {
 
     fn step(&mut self, initial_state: Vec<f64>, input: Vec<f64>) -> Vec<f64> {
         // Ensure passed initial state and input are of the right size
-        if initial_state.len() != 6 {
-            panic!("State vec should be of size 6.")
+        if initial_state.len() != 7 {
+            panic!("State vec should be of size 7.")
         }
         if input.len() != 2 {
             panic!("Input vec should be of size 2.")
@@ -372,14 +372,13 @@ impl Car {
 
     fn update_state(&mut self, config: &SimulationConfig, bodies: &mut RigidBodySet) {
         let chassis = &bodies[self.chassis_handle];
+        let hh = config.chassis_height/2.0;
 
         // Retrieve the position of the car body
         let translation = chassis.translation();
         let x = translation.x;
-        let z = translation.z;
-
-        let hh = config.chassis_height/2.0;
         let y = chassis.translation().y - (hh + hh/4.0);
+        let z = translation.z;
 
         // Calculate the components of the forwards vector.
         let forwards = chassis.position() * Vector3::x_axis();
@@ -391,7 +390,7 @@ impl Car {
         let v = f64::sqrt(linvel.x.powi(2) + linvel.z.powi(2));
         let w = chassis.angvel().y;
 
-        self.state = vec![x, y, nx, nz, v, w];
+        self.state = vec![x, y, z, nx, nz, v, w];
     }
     
     fn remove(&mut self, bodies: &mut RigidBodySet, colliders: &mut ColliderSet, islands: &mut IslandManager, impulse_joints: &mut ImpulseJointSet, multibody_joints: &mut MultibodyJointSet) {
