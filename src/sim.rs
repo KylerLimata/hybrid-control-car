@@ -7,7 +7,7 @@ const CAR_GROUP: Group = Group::GROUP_1;
 
 fn create_floor(bodies: &mut RigidBodySet, colliders: &mut ColliderSet) {
     let ground_size = 5000.0;
-    let ground_height = 1.0;
+    let ground_height = 10.0;
     let rigid_body = RigidBodyBuilder::fixed().translation(vector![0.0, -ground_height, 0.0]);
     let floor_handle = bodies.insert(rigid_body);
     let collider = ColliderBuilder::cuboid(ground_size, ground_height, ground_size)
@@ -124,6 +124,8 @@ impl SimulationEnvironment {
             }
         }
 
+        assert!(should_replace == false);
+
         if should_replace || self.car.is_none() {
             if let Some(car) = &mut self.car.replace(Car::new(
                 initial_state, 
@@ -143,7 +145,7 @@ impl SimulationEnvironment {
         }
 
         if let Some(car) = &mut self.car {
-            car.apply_inputs(input, &mut self.impulse_joints);
+            car.apply_inputs(input.clone(), &mut self.bodies, &mut self.impulse_joints);
         }
 
         let physics_hooks = ();
@@ -168,10 +170,21 @@ impl SimulationEnvironment {
         if let Some(car) = &mut self.car {
             car.update_state(&mut self.bodies);
 
+            // Ensure that the car isn't falling.
             let chassis_body = self.bodies.get(car.chassis_handle).unwrap();
             let hh = self.config.chassis_height/2.0;
+            let y = chassis_body.translation().y;
+            let y_desired = hh + hh/4.0;
 
-            assert!(chassis_body.translation().y == hh + hh/4.0);
+            // If the first assert fails, the car is falling through the floor. If the second one fails, it's rising.
+            assert!(y_desired - y <= 1e-6);
+            assert!(y - y_desired <= 1e-6);
+
+            let wheel_body = self.bodies.get(car.wheels[0]).unwrap();
+
+            if input[0] > 0.0 {
+                assert!(wheel_body.angvel() != &Vector3::zeros())
+            }
 
             return car.state.clone();
         }
@@ -267,6 +280,9 @@ impl Car {
 
             colliders.insert_with_parent(wheel_collider, wheel_handle, bodies);
             wheels.push(wheel_handle);
+
+            assert!(wheel_translation.y == wheel_radius);
+            assert!(wheel_translation.y == 0.0375);
             
             // Create the "axle"
             let axle_body = RigidBodyBuilder::dynamic()
@@ -285,10 +301,9 @@ impl Car {
                 locked_axes = locked_axes | JointAxesMask::ANG_Y
             }
 
-            let axle_joint_attachment = offset - chassis_offset;
             let mut axle_joint = GenericJointBuilder::new(locked_axes)
-                .motor_position(JointAxis::LinY, 0.0, 1.0e4, 1.0e3)
-                .local_anchor1(axle_joint_attachment.into());
+                // .motor_position(JointAxis::LinY, 0.0, 1.0e4, 1.0e3)
+                .local_anchor1(point![offset.x, -(hh + wheel_radius), offset.z]);
 
             if is_front {
                 axle_joint = axle_joint.limits(
@@ -323,10 +338,9 @@ impl Car {
         }
     }
 
-    fn apply_inputs(&mut self, input: Vec<f64>, impulse_joints: &mut ImpulseJointSet) {
+    fn apply_inputs(&mut self, input: Vec<f64>, bodies: &mut RigidBodySet, impulse_joints: &mut ImpulseJointSet) {
         let rpm = input[0];
         let steering_angle = input[1];
-        
 
         for i in 0..2 {
             let axle_joint = impulse_joints.get_mut(self.axle_joints[i]).unwrap();
@@ -345,9 +359,9 @@ impl Car {
 
             wheel_joint.data
                 .set_motor_velocity(
-                    JointAxis::AngZ, 
+                    JointAxis::AngZ,
                     rpm,
-                    1.0e2
+                    1.0e3
                 );
         }
     }
