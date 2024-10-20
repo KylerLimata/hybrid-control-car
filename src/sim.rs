@@ -34,6 +34,8 @@ pub struct SimulationConfig {
     #[pyo3(get, set)]
     pub axle_mass: f64,
     #[pyo3(get, set)]
+    pub suspension_height: f64,
+    #[pyo3(get, set)]
     pub max_steering_angle: f64,
 }
 
@@ -49,6 +51,7 @@ impl SimulationConfig {
             chassis_height: 0.1,
             wheel_mass: 0.01,
             axle_mass: 0.01,
+            suspension_height: 0.2,
             max_steering_angle: std::f64::consts::PI,
         }
     }
@@ -235,6 +238,7 @@ impl Car {
         // let l = config.units_per_meter as f64;
         let hw = config.chassis_width/2.0;
         let hh = config.chassis_height/2.0;
+        let wheel_radius = hh/4.0;
 
         // Calculate the initial position of the vehicle (translation + rotation)
         let car_translation = vector![x0, placement_offset, z0];
@@ -245,7 +249,7 @@ impl Car {
         );
 
         // Create the chassis rigid body
-        let chassis_offset = vector![0.0, hh + hh/4.0, 0.0];
+        let chassis_offset = vector![0.0, hh + wheel_radius, 0.0];
         let chassis_translation = chassis_offset + car_translation;
         let chassis_isometry = Isometry3::new(
             chassis_translation,
@@ -264,7 +268,6 @@ impl Car {
         colliders.insert_with_parent(chassis_collider, chassis_handle, bodies);
         assert!(chassis_translation.y == hh + hh/4.0 + placement_offset);
 
-        let wheel_radius = hh/4.0;
         let wheel_offsets = [
             vector![hw * 1.5, wheel_radius, hw],
             vector![hw * 1.5, wheel_radius, -hw],
@@ -305,7 +308,8 @@ impl Car {
             axles.push(axle_handle);
 
             // Joint between the chassis and the axle
-            let mut locked_axes = JointAxesMask::LIN_AXES
+            let mut locked_axes = JointAxesMask::LIN_X
+                | JointAxesMask::LIN_Z
                 | JointAxesMask::ANG_X
                 | JointAxesMask::ANG_Z;
 
@@ -314,7 +318,8 @@ impl Car {
             }
 
             let mut axle_joint = GenericJointBuilder::new(locked_axes)
-                // .motor_position(JointAxis::LinY, 0.0, 1.0e4, 1.0e3)
+                .limits(JointAxis::LinY, [0.0, config.suspension_height])
+                .motor_position(JointAxis::LinY, 0.0, 1.0e4, 1.0e3)
                 .local_anchor1(point![offset.x, -(hh + wheel_radius), offset.z]);
 
             if is_front {
