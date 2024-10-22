@@ -8,12 +8,12 @@ const CAR_GROUP: Group = Group::GROUP_1;
 fn create_floor(bodies: &mut RigidBodySet, colliders: &mut ColliderSet) {
     let ground_size = 5000.0;
     let ground_height = 10.0;
-    let rigid_body = RigidBodyBuilder::fixed().translation(vector![0.0, -ground_height, 0.0]);
-    let floor_handle = bodies.insert(rigid_body);
-    let collider = ColliderBuilder::cuboid(ground_size, ground_height, ground_size)
+    let ground_body = RigidBodyBuilder::fixed().translation(vector![0.0, -ground_height, 0.0]);
+    let ground_handle = bodies.insert(ground_body);
+    let ground_collider = ColliderBuilder::cuboid(ground_size, ground_height, ground_size)
     .friction(1.0);
 
-    colliders.insert_with_parent(collider, floor_handle, bodies);
+    colliders.insert_with_parent(ground_collider, ground_handle, bodies);
 }
 
 #[pyclass]
@@ -24,15 +24,19 @@ pub struct SimulationConfig {
     #[pyo3(get, set)]
     pub units_per_meter: i64,
     #[pyo3(get, set)]
-    pub chassis_mass: f64,
-    #[pyo3(get, set)]
     pub chassis_width: f64,
+    #[pyo3(get, set)]
+    pub chassis_length: f64,
     #[pyo3(get, set)]
     pub chassis_height: f64,
     #[pyo3(get, set)]
-    pub wheel_mass: f64,
+    pub wheel_radius: f64,
     #[pyo3(get, set)]
-    pub axle_mass: f64,
+    pub chassis_density: f64,
+    #[pyo3(get, set)]
+    pub wheel_density: f64,
+    #[pyo3(get, set)]
+    pub axle_density: f64,
     #[pyo3(get, set)]
     pub suspension_height: f64,
     #[pyo3(get, set)]
@@ -46,11 +50,13 @@ impl SimulationConfig {
         SimulationConfig {
             dt: 0.01,
             units_per_meter: 1,
-            chassis_mass: 1.0,
-            chassis_width: 0.1,
-            chassis_height: 0.1,
-            wheel_mass: 0.01,
-            axle_mass: 0.01,
+            chassis_width: 1.0,
+            chassis_length: 2.0,
+            chassis_height: 1.0,
+            wheel_radius: 0.5,
+            chassis_density: 100.0,
+            wheel_density: 100.0,
+            axle_density: 100.0,
             suspension_height: 0.2,
             max_steering_angle: std::f64::consts::PI,
         }
@@ -128,7 +134,7 @@ impl SimulationEnvironment {
         }
 
         if should_replace || self.car.is_none() {
-            let placement_offset = 0.0;
+            let placement_offset = 0.1;
 
             if let Some(car) = &mut self.car.replace(Car::new(
                 initial_state,
@@ -186,6 +192,17 @@ impl SimulationEnvironment {
         if let Some(car) = &mut self.car {
             car.update_state(&self.config, &mut self.bodies);
 
+            for i in 0..4 {
+                let wheel = &self.bodies[car.wheels[i]];
+                let y = wheel.translation().y;
+                let hh = self.config.chassis_height/2.0;
+                let radius = hh/4.0;
+
+                if y < radius {
+                    panic!("Wheel id {} has fallen through the floor! wheel.y = {}", i, y)
+                }
+            }
+
             return car.state.clone();
         }
 
@@ -236,9 +253,10 @@ impl Car {
 
         // Unpack the parameters
         // let l = config.units_per_meter as f64;
+        let hl = config.chassis_length/2.0;
         let hw = config.chassis_width/2.0;
         let hh = config.chassis_height/2.0;
-        let wheel_radius = hh/4.0;
+        let r = config.wheel_radius;
 
         // Calculate the initial position of the vehicle (translation + rotation)
         let car_translation = vector![x0, placement_offset, z0];
@@ -249,7 +267,7 @@ impl Car {
         );
 
         // Create the chassis rigid body
-        let chassis_offset = vector![0.0, hh + wheel_radius, 0.0];
+        let chassis_offset = vector![0.0, hh + r, 0.0];
         let chassis_translation = chassis_offset + car_translation;
         let chassis_isometry = Isometry3::new(
             chassis_translation,
@@ -259,20 +277,20 @@ impl Car {
             .position(chassis_isometry)
             .linvel(vector![v0*nx0, 0.0, v0*nz0])
             .angvel(vector![0.0, w0, 0.0])
-            .can_sleep(false);
+            .enabled_rotations(false, true, false);
         let chassis_handle = bodies.insert(chassis_body_builder);
-        let chassis_collider = ColliderBuilder::cuboid(hw * 2.0, hh, hw)
-            .mass(config.chassis_mass)
+        let chassis_collider = ColliderBuilder::cuboid(hl, hh, hw)
+            .density(config.chassis_density)
             .collision_groups(InteractionGroups::new(CAR_GROUP, !CAR_GROUP));
 
         colliders.insert_with_parent(chassis_collider, chassis_handle, bodies);
-        assert!(chassis_translation.y == hh + hh/4.0 + placement_offset);
+        assert!(chassis_translation.y == hh + r + placement_offset);
 
         let wheel_offsets = [
-            vector![hw * 1.5, wheel_radius, hw],
-            vector![hw * 1.5, wheel_radius, -hw],
-            vector![-hw * 1.5, wheel_radius, hw],
-            vector![-hw * 1.5, wheel_radius, -hw],
+            vector![hl * 0.75, r, hw],
+            vector![hl * 0.75, r, -hw],
+            vector![-hl * 0.75, r, hw],
+            vector![-hl * 0.75, r, -hw],
         ];
         let mut wheels = vec![];
         let mut axles = vec![];
@@ -286,23 +304,23 @@ impl Car {
             let wheel_translation = (car_isometry * offset) + car_translation;
             
             let wheel_body = RigidBodyBuilder::dynamic()
-                .translation(wheel_translation)
-                .can_sleep(false);
-            let wheel_collider = ColliderBuilder::ball(wheel_radius)
+                .translation(wheel_translation);
+            let wheel_collider = ColliderBuilder::ball(r)
                 .friction(1.0)
                 .collision_groups(InteractionGroups::new(CAR_GROUP, !CAR_GROUP))
-                .mass(config.wheel_mass);
+                .density(config.wheel_density);
             let wheel_handle = bodies.insert(wheel_body);
 
             colliders.insert_with_parent(wheel_collider, wheel_handle, bodies);
             wheels.push(wheel_handle);
 
-            assert!(wheel_translation.y == wheel_radius + placement_offset);
+            assert!(wheel_translation.y == r + placement_offset);
             
             // Create the "axle"
+            let axle_mass_props = MassProperties::from_ball(config.axle_density, r);
             let axle_body = RigidBodyBuilder::dynamic()
                 .translation(wheel_translation)
-                .additional_mass(config.axle_mass);
+                .additional_mass_properties(axle_mass_props);
             let axle_handle = bodies.insert(axle_body);
 
             axles.push(axle_handle);
@@ -320,7 +338,7 @@ impl Car {
             let mut axle_joint = GenericJointBuilder::new(locked_axes)
                 .limits(JointAxis::LinY, [0.0, config.suspension_height])
                 .motor_position(JointAxis::LinY, 0.0, 1.0e4, 1.0e3)
-                .local_anchor1(point![offset.x, -(hh + wheel_radius), offset.z]);
+                .local_anchor1(point![offset.x, -(hh + r), offset.z]);
 
             if is_front {
                 axle_joint = axle_joint.limits(
@@ -386,11 +404,12 @@ impl Car {
     fn update_state(&mut self, config: &SimulationConfig, bodies: &mut RigidBodySet) {
         let chassis = &bodies[self.chassis_handle];
         let hh = config.chassis_height/2.0;
+        let wheel = &bodies[self.wheels[0]];
 
         // Retrieve the position of the car body
         let translation = chassis.translation();
         let x = translation.x;
-        let y = translation.y - (hh + hh/4.0);
+        let y = wheel.translation().y;
         let z = translation.z;
 
         // Calculate the components of the forwards vector.
