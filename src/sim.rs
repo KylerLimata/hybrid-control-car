@@ -66,7 +66,7 @@ impl SimulationConfig {
 #[pyclass]
 pub struct SimulationEnvironment {
     config: SimulationConfig,
-    car: Option<Car>,
+    car: Car,
     physics_pipeline: PhysicsPipeline,
     bodies: RigidBodySet,
     colliders: ColliderSet,
@@ -93,12 +93,14 @@ impl SimulationEnvironment {
         };
         let mut bodies = RigidBodySet::new();
         let mut colliders = ColliderSet::new();
+        let mut impulse_joints = ImpulseJointSet::new();
+        let car = Car::new(vec![0.0, 0.0, 0.0, 1.0, 0.0, 0.0, 0.0], &config, &mut bodies, &mut colliders, &mut impulse_joints);
 
         create_floor(&mut bodies, &mut colliders);
 
-        SimulationEnvironment {
+        let mut env = SimulationEnvironment {
             config,
-            car: None,
+            car: car,
             physics_pipeline: PhysicsPipeline::new(),
             bodies: bodies,
             colliders: colliders,
@@ -107,11 +109,15 @@ impl SimulationEnvironment {
             islands: IslandManager::new(),
             broad_phase: BroadPhaseMultiSap::new(),
             narrow_phase: NarrowPhase::new(),
-            impulse_joints: ImpulseJointSet::new(),
+            impulse_joints: impulse_joints,
             multibody_joints: MultibodyJointSet::new(),
             ccd_solver: CCDSolver::new(),
             query_pipeline: QueryPipeline::new(),
-        }
+        };
+
+        env.reset_car(vec![0.0, 0.0, 0.0, 1.0, 0.0, 0.0, 0.0]);
+
+        return env;
     }
 
     fn step(&mut self, initial_state: Vec<f64>, input: Vec<f64>) -> Vec<f64> {
@@ -125,88 +131,60 @@ impl SimulationEnvironment {
 
         let mut should_replace = false;
 
-        if let Some(car) = &self.car {
-            for i in 0..6 {
-                if (initial_state[i] - car.state[i]).abs() > 1e-3 {
-                    should_replace = true;
-                }
+        for i in 0..6 {
+            if (initial_state[i] - &self.car.state[i]).abs() > 1e-3 {
+                should_replace = true;
             }
         }
 
-        if should_replace || self.car.is_none() {
-            let placement_offset = 0.1;
-
-            if let Some(car) = &mut self.car.replace(Car::new(
-                initial_state,
-                placement_offset,
-                &self.config,
-                &mut self.bodies, 
-                &mut self.colliders, 
-                &mut self.impulse_joints
-            )) {
-                car.remove(
-                    &mut self.bodies, 
-                    &mut self.colliders, 
-                    &mut self.islands, 
-                    &mut self.impulse_joints, 
-                    &mut self.multibody_joints
-                );
-            }
-
-            /*
-            if let Some(car) = &mut self.car {
-                let chassis = self.bodies.get_mut(car.chassis_handle).unwrap();
-                let locked_axes = LockedAxes::TRANSLATION_LOCKED_X
-                    | LockedAxes::TRANSLATION_LOCKED_Z
-                    | LockedAxes::ROTATION_LOCKED;
-
-                chassis.set_locked_axes(locked_axes, true);
-
-                /*
-                while chassis.translation().y - (hh + hh/4.0) > 0.0 {
-                    self.step_pipeline();
-                }
-                */
-            }
-
-            // The car is placed above the floor to avoid clipping through it,
-            // so we need to use Rapier to place the car on the floor.
-            for _ in 0..100 {
-                self.step_pipeline();
-            }
-
-            if let Some(car) = &mut self.car {
-                let chassis = self.bodies.get_mut(car.chassis_handle).unwrap();
-
-                chassis.set_locked_axes(LockedAxes::empty(), true);
-            }
-            */
+        if should_replace {
+            self.reset_car(initial_state);
         }
 
-        if let Some(car) = &mut self.car {
-            car.apply_inputs(input.clone(), &mut self.bodies, &mut self.impulse_joints);
-        }
-
+        self.car.apply_inputs(input.clone(), &mut self.bodies, &mut self.impulse_joints);
         self.step_pipeline();
+        self.car.update_state(&self.config, &mut self.bodies);
 
-        if let Some(car) = &mut self.car {
-            car.update_state(&self.config, &mut self.bodies);
+        for i in 0..4 {
+            let wheel = &self.bodies[self.car.wheels[i]];
+            let y = wheel.translation().y;
+            let hh = self.config.chassis_height/2.0;
+            let radius = hh/4.0;
 
-            for i in 0..4 {
-                let wheel = &self.bodies[car.wheels[i]];
-                let y = wheel.translation().y;
-                let hh = self.config.chassis_height/2.0;
-                let radius = hh/4.0;
-
-                if y < radius {
-                    panic!("Wheel id {} has fallen through the floor! wheel.y = {}", i, y)
-                }
+            if y < radius {
+                panic!("Wheel id {} has fallen through the floor! wheel.y = {}", i, y)
             }
-
-            return car.state.clone();
         }
 
-        panic!("Somehow, the car vanished")
+        return self.car.state.clone();
+    }
+
+    fn reset_car(&mut self, initial_state: Vec<f64>) {
+        self.car.remove(
+            &mut self.bodies, 
+            &mut self.colliders, 
+            &mut self.islands, 
+            &mut self.impulse_joints, 
+            &mut self.multibody_joints
+        );
+
+        self.car = Car::new(
+            initial_state,
+            &self.config,
+            &mut self.bodies, 
+            &mut self.colliders, 
+            &mut self.impulse_joints
+        );
+        let mut sleeping = false;
+
+        while !sleeping {
+            self.step_pipeline();
+
+            let chassis = self.bodies.get_mut(self.car.chassis_handle).unwrap();
+            sleeping = chassis.is_sleeping();
+        }
+
+        self.car.unlock(&mut self.bodies);
     }
 
     fn step_pipeline(&mut self) {
@@ -241,7 +219,7 @@ struct Car {
 }
 
 impl Car {
-    fn new(initial_state: Vec<f64>, placement_offset: f64, config: &SimulationConfig, bodies: &mut RigidBodySet, colliders: &mut ColliderSet, impulse_joints: &mut ImpulseJointSet) -> Self {
+    fn new(initial_state: Vec<f64>, config: &SimulationConfig, bodies: &mut RigidBodySet, colliders: &mut ColliderSet, impulse_joints: &mut ImpulseJointSet) -> Self {
         // Unpack the state vector
         let x0 = initial_state[0];
         let z0 = initial_state[1];
@@ -257,6 +235,7 @@ impl Car {
         let hw = config.chassis_width/2.0;
         let hh = config.chassis_height/2.0;
         let r = config.wheel_radius;
+        let placement_offset = r + config.suspension_height;
 
         // Calculate the initial position of the vehicle (translation + rotation)
         let car_translation = vector![x0, placement_offset, z0];
@@ -277,7 +256,8 @@ impl Car {
             .position(chassis_isometry)
             .linvel(vector![v0*nx0, 0.0, v0*nz0])
             .angvel(vector![0.0, w0, 0.0])
-            .enabled_rotations(false, true, false);
+            .enabled_rotations(false, false, false)
+            .enabled_translations(false, true, false);
         let chassis_handle = bodies.insert(chassis_body_builder);
         let chassis_collider = ColliderBuilder::cuboid(hl, hh, hw)
             .density(config.chassis_density)
@@ -376,6 +356,9 @@ impl Car {
     fn apply_inputs(&mut self, input: Vec<f64>, bodies: &mut RigidBodySet, impulse_joints: &mut ImpulseJointSet) {
         let rpm = input[0];
         let steering_angle = input[1];
+        let chassis = &mut bodies[self.chassis_handle];
+
+        chassis.wake_up(true);
 
         for i in 0..2 {
             let axle_joint = impulse_joints.get_mut(self.axle_joints[i]).unwrap();
@@ -403,13 +386,12 @@ impl Car {
 
     fn update_state(&mut self, config: &SimulationConfig, bodies: &mut RigidBodySet) {
         let chassis = &bodies[self.chassis_handle];
-        let hh = config.chassis_height/2.0;
         let wheel = &bodies[self.wheels[0]];
 
         // Retrieve the position of the car body
         let translation = chassis.translation();
         let x = translation.x;
-        let y = wheel.translation().y;
+        let y = wheel.translation().y - config.wheel_radius;
         let z = translation.z;
 
         // Calculate the components of the forwards vector.
@@ -425,6 +407,13 @@ impl Car {
         self.state = vec![x, y, z, nx, nz, v, w];
     }
     
+    fn unlock(&mut self, bodies: &mut RigidBodySet) {
+        let chassis = &mut bodies[self.chassis_handle];
+        let locked_axes = LockedAxes::ROTATION_LOCKED_X | LockedAxes::ROTATION_LOCKED_Z;
+
+        chassis.set_locked_axes(locked_axes, false);
+    }
+
     fn remove(&mut self, bodies: &mut RigidBodySet, colliders: &mut ColliderSet, islands: &mut IslandManager, impulse_joints: &mut ImpulseJointSet, multibody_joints: &mut MultibodyJointSet) {
         for i in 0..4 {            
             bodies.remove(
