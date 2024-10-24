@@ -217,43 +217,50 @@ impl CarSimulation {
     }
 
     fn apply_inputs(&mut self, input: Vec<f64>) {
-        
+        let engine_force = input[0];
+        let steering_angle = input[1];
+
+        let car = self.car.as_mut().unwrap();
+        let wheels = car.wheels_mut();
+
+        wheels[0].engine_force = engine_force;
+        wheels[0].steering = steering_angle;
+        wheels[1].engine_force = engine_force;
+        wheels[1].steering = steering_angle;
     }
 
     fn update_state(&mut self) {
-        // Update the car
-        car.update_vehicle(
-            self.integration_parameters.dt,
-            &mut self.bodies,
-            &self.colliders,
-            &self.query_pipeline,
-            QueryFilter::exclude_dynamic().exclude_rigid_body(car_handle),
-        );
-        let car_body = &self.bodies[car_handle];
+        if let Some(car) = &mut self.car {
+            let car_handle = car.chassis;
+
+            // Update the car
+            car.update_vehicle(
+                self.integration_parameters.dt,
+                &mut self.bodies,
+                &self.colliders,
+                &self.query_pipeline,
+                QueryFilter::exclude_dynamic().exclude_rigid_body(car_handle),
+            );
+
+            let car_body = &self.bodies[car_handle];
         
-        // Retrieve the horizontal position of the vehicle
-        let translation = car_body.translation();
-        let x = translation.x;
-        let z = translation.z;
+            // Retrieve the horizontal position of the vehicle
+            let translation = car_body.translation();
+            let x = translation.x;
+            let z = translation.z;
 
-        // Retrieve the forward and angular velocity of the vehicle
-        let v = car.current_vehicle_speed;
-        let omega_c = car_body.angvel().y;
+            // Retrieve the forward and angular velocity of the vehicle
+            let v = car.current_vehicle_speed;
+            let w = car_body.angvel().y;
 
-        // Calculate the components of the forwards vector.
-        let forwards = car_body.position() * Vector3::ith(car.index_forward_axis, 1.0);
-        let forwards_horiozntal = UnitVector::new_normalize(
-            vector![forwards.x, 0.0, forwards.z]
-        );
-        let n_x = forwards_horiozntal.x;
-        let n_z = forwards_horiozntal.z;
+            // Calculate the components of the forwards vector.
+            let forwards = car_body.position() * Vector3::ith(car.index_forward_axis, 1.0);
+            let n_x = forwards.x;
+            let n_z = forwards.z;
 
-        // Retrieve the angular velocity of the front wheels
-        let omega_w = wheel_rotation - self.last_wheel_rotation;
-        self.last_wheel_rotation = wheel_rotation;
-
-        // Create the state vector
-        self.state = vec![x, z, v, n_x, n_z, omega_c, omega_w];
+            // Create the state vector
+            self.state = vec![x, z, n_x, n_z, v, w];
+        }
     }
 }
 
