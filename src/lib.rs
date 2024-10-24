@@ -22,7 +22,8 @@ struct CarSimulation {
     query_pipeline: QueryPipeline,
     car: Option<DynamicRayCastVehicleController>,
     last_wheel_rotation: f64,
-    history: Vec<Vec<f64>>
+    history: Vec<Vec<f64>>,
+    state: Vec<f64>
 }
 
 #[pymethods]
@@ -44,7 +45,8 @@ impl CarSimulation {
             query_pipeline: QueryPipeline::new(),
             car: None,
             last_wheel_rotation: 0.0,
-            history: vec![]
+            history: vec![],
+            state: vec![]
         };
 
         sim.reset_car(0.0);
@@ -110,7 +112,7 @@ impl CarSimulation {
         self.colliders.insert_with_parent(collider, floor_handle, &mut self.bodies);
     }
 
-    fn step(&mut self, timestep: usize, engine_force: f64, steering_angle: f64) -> PyResult<(Vec<f64>, bool, bool, bool)> {
+    fn step_old(&mut self, timestep: usize, engine_force: f64, steering_angle: f64) -> PyResult<(Vec<f64>, bool, bool, bool)> {
         // Check if the car has already been simulated at the passed timestep
         if self.history.len() >= timestep + 1 {
             return Ok((self.history[timestep].clone(), false, false, false));
@@ -185,6 +187,73 @@ impl CarSimulation {
         let colliding = collider.active_events().contains(ActiveEvents::COLLISION_EVENTS);
 
         Ok((state, colliding, false, false))
+    }
+
+    fn step(&mut self, initial_state: Vec<f64>, input: Vec<f64>) -> Vec<f64> {
+        self.apply_inputs(input);
+        
+        let physics_hooks = ();
+        let event_handler = ();
+
+        self.physics_pipeline.step(
+            &self.gravity,
+            &self.integration_parameters,
+            &mut self.islands,
+            &mut self.broad_phase,
+            &mut self.narrow_phase,
+            &mut self.bodies,
+            &mut self.colliders,
+            &mut self.impulse_joints,
+            &mut self.multibody_joints,
+            &mut self.ccd_solver,
+            Some(&mut self.query_pipeline),
+            &physics_hooks,
+            &event_handler,
+        );
+
+        self.update_state();
+
+        return self.state.clone();
+    }
+
+    fn apply_inputs(&mut self, input: Vec<f64>) {
+        
+    }
+
+    fn update_state(&mut self) {
+        // Update the car
+        car.update_vehicle(
+            self.integration_parameters.dt,
+            &mut self.bodies,
+            &self.colliders,
+            &self.query_pipeline,
+            QueryFilter::exclude_dynamic().exclude_rigid_body(car_handle),
+        );
+        let car_body = &self.bodies[car_handle];
+        
+        // Retrieve the horizontal position of the vehicle
+        let translation = car_body.translation();
+        let x = translation.x;
+        let z = translation.z;
+
+        // Retrieve the forward and angular velocity of the vehicle
+        let v = car.current_vehicle_speed;
+        let omega_c = car_body.angvel().y;
+
+        // Calculate the components of the forwards vector.
+        let forwards = car_body.position() * Vector3::ith(car.index_forward_axis, 1.0);
+        let forwards_horiozntal = UnitVector::new_normalize(
+            vector![forwards.x, 0.0, forwards.z]
+        );
+        let n_x = forwards_horiozntal.x;
+        let n_z = forwards_horiozntal.z;
+
+        // Retrieve the angular velocity of the front wheels
+        let omega_w = wheel_rotation - self.last_wheel_rotation;
+        self.last_wheel_rotation = wheel_rotation;
+
+        // Create the state vector
+        self.state = vec![x, z, v, n_x, n_z, omega_c, omega_w];
     }
 }
 
