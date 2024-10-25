@@ -28,8 +28,8 @@ struct CarSimulation {
 impl CarSimulation {
     #[new]
     fn new() -> Self {
-        let bodies = RigidBodySet::new();
-        let colliders = ColliderSet::new();
+        let mut bodies = RigidBodySet::new();
+        let mut colliders = ColliderSet::new();
         let initial_state = vec![0.0, 0.0, 0.0, 0.0, 0.0, 0.0];
         let car = init_car(initial_state, &mut bodies, &mut colliders);
 
@@ -40,8 +40,8 @@ impl CarSimulation {
             islands: IslandManager::new(),
             broad_phase: BroadPhaseMultiSap::new(),
             narrow_phase: NarrowPhase::new(),
-            bodies: RigidBodySet::new(),
-            colliders: ColliderSet::new(),
+            bodies: bodies,
+            colliders: colliders,
             impulse_joints: ImpulseJointSet::new(),
             multibody_joints: MultibodyJointSet::new(),
             ccd_solver: CCDSolver::new(),
@@ -64,6 +64,34 @@ impl CarSimulation {
     }
 
     fn step(&mut self, initial_state: Vec<f64>, input: Vec<f64>) -> Vec<f64> {
+        let mut should_replace = false;
+
+        for i in 0..6 {
+            if (initial_state[i] - &self.state[i]).abs() > 1e-3 {
+                should_replace = true;
+            }
+        }
+
+        if should_replace {
+            let handle = self.car.chassis;
+
+            self.bodies.remove(
+                handle, 
+                &mut self.islands, 
+                &mut self.colliders, 
+                &mut self.impulse_joints, 
+                &mut self.multibody_joints, 
+                true
+            );
+
+            self.car = init_car(
+                initial_state, 
+                &mut self.bodies, 
+                &mut self.colliders
+            )
+        }
+
+
         self.apply_inputs(input);
         
         let physics_hooks = ();
@@ -90,16 +118,13 @@ impl CarSimulation {
         return self.state.clone();
     }
 
-    fn reset_car(&mut self, initial_state: Vec<f64>) {
-        
-    }
-
     fn apply_inputs(&mut self, input: Vec<f64>) {
+        // Unpack input
         let engine_force = input[0];
         let steering_angle = input[1];
 
-        let car = self.car.as_mut().unwrap();
-        let wheels = car.wheels_mut();
+        // Apply inputs
+        let wheels = self.car.wheels_mut();
 
         wheels[0].engine_force = engine_force;
         wheels[0].steering = steering_angle;
@@ -108,37 +133,35 @@ impl CarSimulation {
     }
 
     fn update_state(&mut self) {
-        if let Some(car) = &mut self.car {
-            let car_handle = car.chassis;
+        let car_handle = self.car.chassis;
 
-            // Update the car
-            car.update_vehicle(
-                self.integration_parameters.dt,
-                &mut self.bodies,
-                &self.colliders,
-                &self.query_pipeline,
-                QueryFilter::exclude_dynamic().exclude_rigid_body(car_handle),
-            );
+        // Update the car
+        self.car.update_vehicle(
+            self.integration_parameters.dt,
+            &mut self.bodies,
+            &self.colliders,
+            &self.query_pipeline,
+            QueryFilter::exclude_dynamic().exclude_rigid_body(car_handle),
+        );
 
-            let car_body = &self.bodies[car_handle];
-        
-            // Retrieve the horizontal position of the vehicle
-            let translation = car_body.translation();
-            let x = translation.x;
-            let z = translation.z;
+        let car_body = &self.bodies[car_handle];
+    
+        // Retrieve the horizontal position of the vehicle
+        let translation = car_body.translation();
+        let x = translation.x;
+        let z = translation.z;
 
-            // Retrieve the forward and angular velocity of the vehicle
-            let v = car.current_vehicle_speed;
-            let w = car_body.angvel().y;
+        // Retrieve the forward and angular velocity of the vehicle
+        let v = self.car.current_vehicle_speed;
+        let w = car_body.angvel().y;
 
-            // Calculate the components of the forwards vector.
-            let forwards = car_body.position() * Vector3::ith(car.index_forward_axis, 1.0);
-            let n_x = forwards.x;
-            let n_z = forwards.z;
+        // Calculate the components of the forwards vector.
+        let forwards = car_body.position() * Vector3::ith(self.car.index_forward_axis, 1.0);
+        let n_x = forwards.x;
+        let n_z = forwards.z;
 
-            // Create the state vector
-            self.state = vec![x, z, n_x, n_z, v, w];
-        }
+        // Create the state vector
+        self.state = vec![x, z, n_x, n_z, v, w];
     }
 }
 
