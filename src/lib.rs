@@ -49,12 +49,12 @@ impl CarSimulation {
             state: vec![]
         };
 
-        sim.reset_car(0.0);
+        sim.reset_car_old(0.0);
 
         return sim;
     }
 
-    fn reset_car(&mut self, rotation: f64) {
+    fn reset_car_old(&mut self, rotation: f64) {
         let bodies = &mut self.bodies;
         self.last_wheel_rotation = 0.0;
         self.history = vec![];
@@ -216,6 +216,10 @@ impl CarSimulation {
         return self.state.clone();
     }
 
+    fn reset_car(&mut self, initial_state: Vec<f64>) {
+
+    }
+
     fn apply_inputs(&mut self, input: Vec<f64>) {
         let engine_force = input[0];
         let steering_angle = input[1];
@@ -262,6 +266,49 @@ impl CarSimulation {
             self.state = vec![x, z, n_x, n_z, v, w];
         }
     }
+}
+
+fn init_car(initial_state: Vec<f64>, bodies: &mut RigidBodySet, colliders: &mut ColliderSet) -> DynamicRayCastVehicleController {
+    // Unpack the state vector
+    let x0 = initial_state[0];
+    let z0 = initial_state[1];
+    let nx0 = initial_state[2];
+    let nz0 = initial_state[3];
+    let v0 = initial_state[4];
+    let w0 = initial_state[5];
+    let phi0 = libm::atan2(nz0, nx0);
+
+    // Create the chassis body
+    let hw = 0.3;
+    let hh = 0.15;
+    let rigid_body = RigidBodyBuilder::dynamic()
+        .translation(vector![x0, 2.0*hh + hh/4.0, z0])
+        .rotation(vector![0.0, phi0, 0.0])
+        .linvel(vector![v0*nx0, 0.0, v0*nz0])
+        .angvel(vector![0.0, w0, 0.0]);
+    let vehicle_handle = bodies.insert(rigid_body);
+    let collider = ColliderBuilder::cuboid(hw * 2.0, hh, hw).density(100.0);
+
+    colliders.insert_with_parent(collider, vehicle_handle, bodies);
+
+    let tuning = WheelTuning {
+        suspension_stiffness: 100.0,
+        suspension_damping: 10.0,
+        ..WheelTuning::default()
+    };
+    let mut car = DynamicRayCastVehicleController::new(vehicle_handle);
+    let wheel_positions = [
+        point![hw * 1.5, -hh, hw],
+        point![hw * 1.5, -hh, -hw],
+        point![-hw * 1.5, -hh, hw],
+        point![-hw * 1.5, -hh, -hw],
+    ];
+
+    for pos in wheel_positions {
+        car.add_wheel(pos, -Vector::y(), Vector::z(), hh, hh / 4.0, &tuning);
+    }
+
+    return car;
 }
 
 #[pymodule]
