@@ -27,7 +27,13 @@ struct CarSimulation {
 #[pymethods]
 impl CarSimulation {
     #[new]
-    fn new() -> Self {
+    fn new(config: SimulationConfig) -> Self {
+        let integration_parameters = IntegrationParameters {
+            dt: config.dt,
+            min_ccd_dt: config.dt/100.0,
+            length_unit: config.units_per_meter as f64,
+            ..IntegrationParameters::default()
+        };
         let mut bodies = RigidBodySet::new();
         let mut colliders = ColliderSet::new();
         let initial_state = vec![0.0, 0.0, 0.0, 0.0, 0.0, 0.0];
@@ -36,7 +42,7 @@ impl CarSimulation {
         let sim = CarSimulation {
             physics_pipeline: PhysicsPipeline::new(),
             gravity: vector![0.0, -9.81, 0.0],
-            integration_parameters: IntegrationParameters::default(),
+            integration_parameters: integration_parameters,
             islands: IslandManager::new(),
             broad_phase: BroadPhaseMultiSap::new(),
             narrow_phase: NarrowPhase::new(),
