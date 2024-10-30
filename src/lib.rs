@@ -36,8 +36,8 @@ impl CarSimulation {
         };
         let mut bodies = RigidBodySet::new();
         let mut colliders = ColliderSet::new();
-        let initial_state = vec![0.0, 0.0, 0.0, 0.0, 0.0, 0.0];
-        let car = init_car(initial_state, &mut bodies, &mut colliders);
+        let initial_state = vec![0.0, 0.0, 1.0, 0.0, 0.0, 0.0];
+        let car = init_car(initial_state.clone(), &mut bodies, &mut colliders);
 
         let sim = CarSimulation {
             physics_pipeline: PhysicsPipeline::new(),
@@ -53,7 +53,7 @@ impl CarSimulation {
             ccd_solver: CCDSolver::new(),
             query_pipeline: QueryPipeline::new(),
             car: car,
-            state: vec![]
+            state: initial_state
         };
 
         return sim;
