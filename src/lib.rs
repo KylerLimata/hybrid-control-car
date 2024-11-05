@@ -1,4 +1,4 @@
-use nalgebra::Vector3;
+use nalgebra::{UnitVector3, Vector3};
 use rapier3d_f64::control::{DynamicRayCastVehicleController, WheelTuning};
 use rapier3d_f64::prelude::*;
 use pyo3::prelude::*;
@@ -157,14 +157,20 @@ impl CarSimulation {
         let x = translation.x;
         let z = translation.z;
 
-        // Retrieve the forward and angular velocity of the vehicle
-        let v = self.car.current_vehicle_speed;
-        let w = car_body.angvel().y;
-
         // Calculate the components of the forwards vector.
-        let forwards = car_body.position() * Vector3::ith(self.car.index_forward_axis, 1.0);
-        let n_x = forwards.x;
-        let n_z = forwards.z;
+        let forwards = car_body.rotation() * Vector3::ith(self.car.index_forward_axis, 1.0);
+        let forwards_horizontal = UnitVector3::new_normalize(vector![
+            forwards.x,
+            0.0,
+            forwards.z
+        ]);
+        let n_x = forwards_horizontal.x;
+        let n_z = forwards_horizontal.z;
+
+        // Retrieve the forward and angular velocity of the vehicle
+        let linvel = car_body.linvel();
+        let v = f64::sqrt(linvel.x.powf(2.0) + linvel.z.powf(2.0));
+        let w = car_body.angvel().y;
 
         // Create the state vector
         self.state = vec![x, z, n_x, n_z, v, w];
